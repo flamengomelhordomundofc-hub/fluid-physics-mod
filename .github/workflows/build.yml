@@ -529,7 +529,7 @@ jobs:
                   entityData.set(D_RAD, Math.min(4.0F, maxR));
               }
 
-              public List<Part> getParts() {
+              public List<Part> getBlockParts() {
                   int[] arr = entityData.get(D_PARTS).getIntArray("p");
                   int h = Arrays.hashCode(arr);
                   if (h != lastHash || parts.isEmpty()) {
@@ -617,7 +617,7 @@ jobs:
                       return;
                   }
                   if (bCd > 0) bCd--;
-                  List<Part> plist = getParts();
+                  List<Part> plist = getBlockParts();
                   BlockState mainSt = plist.get(0).state;
                   stepRigid(sLvl, plist);
                   if (lastImp > 0.20F && bCd == 0) {
@@ -904,7 +904,7 @@ jobs:
               public boolean hurt(DamageSource src, float amt) {
                   if (!level().isClientSide() && isPersistent() && src.getEntity() instanceof Player pl) {
                       ServerLevel sLvl = (ServerLevel) level();
-                      List<Part> plist = getParts();
+                      List<Part> plist = getBlockParts();
                       if (pl.isShiftKeyDown()) {
                           for (Part pt : plist) {
                               BlockPos bp = BlockPos.containing(px + pt.ox, py + pt.oy, pz + pt.oz);
@@ -987,7 +987,7 @@ jobs:
                   wy = t.getFloat("Wy");
                   wz = t.getFloat("Wz");
                   if (t.contains("Qw")) rot.set(t.getFloat("Qx"), t.getFloat("Qy"), t.getFloat("Qz"), t.getFloat("Qw")).normalize();
-                  setParts(getParts());
+                  setParts(getBlockParts());
                   syncAll();
               }
 
@@ -2034,7 +2034,7 @@ jobs:
                       ps.pushPose();
                       ps.translate(0.0, 0.50, 0.0);
                       ps.mulPose(ent.getInterpQ(pt));
-                      for (FPBlockEntity.Part part : ent.getParts()) {
+                      for (FPBlockEntity.Part part : ent.getBlockParts()) {
                           if (part.state.getRenderShape() != RenderShape.MODEL) continue;
                           BakedModel mod = brd.getBlockModel(part.state);
                           int col = mc.getBlockColors().getColor(part.state, ent.level(), ent.blockPosition(), 0);
