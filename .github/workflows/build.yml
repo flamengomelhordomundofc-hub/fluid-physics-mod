@@ -1,0 +1,1607 @@
+name: Build Fluid Physics Mod (1.20.1 Forge)
+
+on:
+  push:
+  workflow_dispatch:
+
+env:
+  GRADLE_OPTS: "-Xmx3G"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle 8.8
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.8'
+
+      - name: Generate Mod Project & Source Code
+        run: |
+          mkdir -p src/main/java/com/fluidphysics/physics
+          mkdir -p src/main/java/com/fluidphysics/entity
+          mkdir -p src/main/java/com/fluidphysics/network
+          mkdir -p src/main/java/com/fluidphysics/events
+          mkdir -p src/main/java/com/fluidphysics/client
+          mkdir -p src/main/resources/META-INF
+          mkdir -p src/main/resources/assets/fluidphysics/lang
+
+          cat << 'EOF' > gradle.properties
+          org.gradle.jvmargs=-Xmx3G
+          org.gradle.daemon=false
+          EOF
+
+          cat << 'EOF' > settings.gradle
+          pluginManagement {
+              repositories {
+                  gradlePluginPortal()
+                  maven {
+                      name = 'MinecraftForge'
+                      url = 'https://maven.minecraftforge.net/'
+                  }
+              }
+          }
+          rootProject.name = 'FluidPhysicsMod'
+          EOF
+
+          cat << 'EOF' > build.gradle
+          plugins {
+              id 'net.minecraftforge.gradle' version '[6.0.24,6.2)'
+          }
+
+          version = '1.0.0'
+          group = 'com.fluidphysics'
+
+          base {
+              archivesName = 'fluidphysics'
+          }
+
+          java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+          minecraft {
+              mappings channel: 'official', version: '1.20.1'
+          }
+
+          dependencies {
+              minecraft 'net.minecraftforge:forge:1.20.1-47.2.0'
+          }
+
+          jar {
+              manifest {
+                  attributes([
+                      'Specification-Title'     : 'fluidphysics',
+                      'Specification-Vendor'    : 'FluidPhysicsDev',
+                      'Specification-Version'   : '1',
+                      'Implementation-Title'    : project.name,
+                      'Implementation-Version'  : '1.0.0',
+                      'Implementation-Vendor'   : 'FluidPhysicsDev'
+                  ])
+              }
+              finalizedBy 'reobfJar'
+          }
+
+          tasks.withType(JavaCompile).configureEach {
+              options.encoding = 'UTF-8'
+          }
+          EOF
+
+          cat << 'EOF' > src/main/resources/pack.mcmeta
+          {
+            "pack": {
+              "description": "Fluid Physics Mod Resources",
+              "pack_format": 15
+            }
+          }
+          EOF
+
+          cat << 'EOF' > src/main/resources/META-INF/mods.toml
+          modLoader="javafml"
+          loaderVersion="[47,)"
+          license="MIT"
+
+          [[mods]]
+          modId="fluidphysics"
+          version="1.0.0"
+          displayName="Fluid Physics"
+          authors="FluidPhysicsDev"
+          description='''
+          Real-time 3D rigid-body block physics, free-angle tumbling falling blocks, placement impact physics, 3D dropped items, explosions, water buoyancy, and player-interactive 3D particles for Minecraft 1.20.1 Forge.
+          '''
+
+          [[dependencies.fluidphysics]]
+              modId="forge"
+              mandatory=true
+              versionRange="[47,)"
+              ordering="NONE"
+              side="BOTH"
+
+          [[dependencies.fluidphysics]]
+              modId="minecraft"
+              mandatory=true
+              versionRange="[1.20.1,1.21)"
+              ordering="NONE"
+              side="BOTH"
+          EOF
+
+          cat << 'EOF' > src/main/resources/assets/fluidphysics/lang/en_us.json
+          {
+            "entity.fluidphysics.fluid_block": "Physics Block"
+          }
+          EOF
+
+          cat << 'EOF' > src/main/resources/assets/fluidphysics/lang/pt_br.json
+          {
+            "entity.fluidphysics.fluid_block": "Bloco Físico"
+          }
+          EOF
+
+          cat << 'EOF' > src/main/java/com/fluidphysics/FluidPhysicsMod.java
+          package com.fluidphysics;
+
+          import com.fluidphysics.entity.FluidBlockEntity;
+          import com.fluidphysics.events.ServerPhysicsEvents;
+          import com.fluidphysics.network.ModNetwork;
+          import net.minecraft.world.entity.EntityType;
+          import net.minecraft.world.entity.MobCategory;
+          import net.minecraftforge.common.MinecraftForge;
+          import net.minecraftforge.eventbus.api.IEventBus;
+          import net.minecraftforge.fml.common.Mod;
+          import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
+          import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+          import net.minecraftforge.registries.DeferredRegister;
+          import net.minecraftforge.registries.ForgeRegistries;
+          import net.minecraftforge.registries.RegistryObject;
+
+          @Mod(FluidPhysicsMod.MODID)
+          public class FluidPhysicsMod {
+              public static final String MODID = "fluidphysics";
+
+              public static final DeferredRegister<EntityType<?>> ENTITIES =
+                  DeferredRegister.create(ForgeRegistries.ENTITY_TYPES, MODID);
+
+              public static final RegistryObject<EntityType<FluidBlockEntity>> FLUID_BLOCK =
+                  ENTITIES.register("fluid_block", () ->
+                      EntityType.Builder.<FluidBlockEntity>of(FluidBlockEntity::new, MobCategory.MISC)
+                          .sized(0.98F, 0.98F)
+                          .clientTrackingRange(10)
+                          .updateInterval(1)
+                          .build("fluid_block")
+                  );
+
+              public FluidPhysicsMod() {
+                  IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
+                  ENTITIES.register(modBus);
+                  modBus.addListener(this::commonSetup);
+                  MinecraftForge.EVENT_BUS.register(new ServerPhysicsEvents());
+              }
+
+              private void commonSetup(final FMLCommonSetupEvent event) {
+                  event.enqueueWork(ModNetwork::register);
+              }
+          }
+          EOF
+
+          cat << 'EOF' > src/main/java/com/fluidphysics/physics/PhysicsConfig.java
+          package com.fluidphysics.physics;
+
+          import net.minecraft.core.BlockPos;
+          import net.minecraft.tags.BlockTags;
+          import net.minecraft.world.level.BlockGetter;
+          import net.minecraft.world.level.block.Blocks;
+          import net.minecraft.world.level.block.FallingBlock;
+          import net.minecraft.world.level.block.SoundType;
+          import net.minecraft.world.level.block.TntBlock;
+          import net.minecraft.world.level.block.state.BlockState;
+
+          public final class PhysicsConfig {
+              public static volatile boolean fullGravity = false;
+              public static volatile boolean placementPhysics = true;
+              // 0 = low, 1 = medium, 2 = high
+              public static volatile int qualityLevel = 1;
+
+              public static int getMaxFragments() {
+                  return switch (qualityLevel) {
+                      case 0 -> 120;
+                      case 2 -> 520;
+                      default -> 260;
+                  };
+              }
+
+              public static int getMaxParticles() {
+                  return switch (qualityLevel) {
+                      case 0 -> 450;
+                      case 2 -> 2400;
+                      default -> 1150;
+                  };
+              }
+
+              public static boolean isNaturalGravity(BlockState state) {
+                  return state.getBlock() instanceof FallingBlock;
+              }
+
+              public static boolean isSafePhysicsBlock(BlockState state, BlockGetter level, BlockPos pos) {
+                  if (state == null || state.isAir() || state.hasBlockEntity()) return false;
+                  if (!state.getFluidState().isEmpty()) return false;
+                  if (state.getDestroySpeed(level, pos) < 0.0F) return false;
+                  if (state.getBlock() instanceof TntBlock) return false;
+                  return state.isCollisionShapeFullBlock(level, pos);
+              }
+
+              public static float getRestitution(BlockState state) {
+                  SoundType sound = state.getSoundType();
+                  if (sound == SoundType.SLIME_BLOCK || state.is(Blocks.SLIME_BLOCK)) return 0.84F;
+                  if (sound == SoundType.HONEY_BLOCK || state.is(Blocks.HONEY_BLOCK)) return 0.05F;
+                  if (sound == SoundType.SAND || sound == SoundType.GRAVEL || sound == SoundType.SNOW) return 0.14F;
+                  if (sound == SoundType.GRASS || state.is(BlockTags.DIRT)) return 0.18F;
+                  if (sound == SoundType.WOOL) return 0.22F;
+                  if (sound == SoundType.WOOD) return 0.34F;
+                  if (sound == SoundType.GLASS) return 0.30F;
+                  if (sound == SoundType.METAL || sound == SoundType.ANVIL) return 0.36F;
+                  return 0.28F;
+              }
+
+              public static float getFriction(BlockState state) {
+                  if (state.is(BlockTags.ICE)) return 0.04F;
+                  SoundType sound = state.getSoundType();
+                  if (sound == SoundType.HONEY_BLOCK) return 0.96F;
+                  if (sound == SoundType.SLIME_BLOCK) return 0.50F;
+                  if (sound == SoundType.GLASS) return 0.32F;
+                  if (sound == SoundType.METAL) return 0.42F;
+                  if (sound == SoundType.SAND || sound == SoundType.GRAVEL) return 0.68F;
+                  return 0.56F;
+              }
+
+              public static float getBuoyancy(BlockState state) {
+                  SoundType sound = state.getSoundType();
+                  if (state.is(BlockTags.LOGS) || state.is(BlockTags.PLANKS) ||
+                      state.is(BlockTags.LEAVES) || state.is(BlockTags.WOOL) ||
+                      sound == SoundType.WOOD || sound == SoundType.WOOL ||
+                      state.is(Blocks.SPONGE) || state.is(Blocks.HAY_BLOCK) ||
+                      state.is(BlockTags.ICE)) {
+                      return 1.65F;
+                  }
+                  if (sound == SoundType.SLIME_BLOCK || sound == SoundType.SNOW) return 1.25F;
+                  if (sound == SoundType.METAL || sound == SoundType.ANVIL || state.is(Blocks.OBSIDIAN)) return 0.30F;
+                  if (sound == SoundType.STONE) return 0.45F;
+                  return 0.65F;
+              }
+
+              public static float getMass(BlockState state) {
+                  SoundType sound = state.getSoundType();
+                  if (sound == SoundType.ANVIL || state.is(BlockTags.ANVIL) || state.is(Blocks.OBSIDIAN)) return 3.2F;
+                  if (sound == SoundType.METAL) return 2.4F;
+                  if (sound == SoundType.STONE) return 1.8F;
+                  if (sound == SoundType.WOOD) return 0.9F;
+                  if (sound == SoundType.WOOL || state.is(BlockTags.LEAVES) || sound == SoundType.SNOW) return 0.55F;
+                  return 1.2F;
+              }
+
+              public static boolean isTintedParticleBlock(BlockState state) {
+                  return state.is(BlockTags.LEAVES)
+                      || state.is(Blocks.GRASS)
+                      || state.is(Blocks.TALL_GRASS)
+                      || state.is(Blocks.FERN)
+                      || state.is(Blocks.LARGE_FERN)
+                      || state.is(Blocks.VINE)
+                      || state.is(Blocks.LILY_PAD)
+                      || state.is(Blocks.SUGAR_CANE);
+              }
+          }
+          EOF
+
+          cat << 'EOF' > src/main/java/com/fluidphysics/physics/OBBPhysicsSolver.java
+          package com.fluidphysics.physics;
+
+          import net.minecraft.core.BlockPos;
+          import net.minecraft.util.Mth;
+          import net.minecraft.world.level.Level;
+          import net.minecraft.world.level.block.state.BlockState;
+          import net.minecraft.world.level.material.FluidState;
+          import net.minecraft.world.phys.AABB;
+          import net.minecraft.world.phys.Vec3;
+          import net.minecraft.world.phys.shapes.Shapes;
+          import net.minecraft.world.phys.shapes.VoxelShape;
+          import org.joml.Quaternionf;
+          import org.joml.Vector3f;
+
+          import java.util.List;
+
+          public final class OBBPhysicsSolver {
+
+              public static class RigidBody {
+                  public double x, y, z;
+                  public float vx, vy, vz;
+                  public final Quaternionf rot = new Quaternionf();
+                  public float wx, wy, wz;
+                  public float hx = 0.5F, hy = 0.5F, hz = 0.5F;
+                  public float mass = 1.0F;
+                  public float restitution = 0.28F;
+                  public float friction = 0.55F;
+                  public float buoyancy = 0.65F;
+                  public boolean onGround = false;
+                  public boolean inWater = false;
+                  public float lastImpactSpeed = 0.0F;
+                  public boolean highPrecision = false;
+
+                  public void applyImpulse(float ix, float iy, float iz, float rx, float ry, float rz) {
+                      float invMass = 1.0F / Math.max(0.2F, mass);
+                      float invI = 3.2F / (Math.max(0.2F, mass) * (hx * hx + hy * hy + hz * hz));
+                      vx += ix * invMass;
+                      vy += iy * invMass;
+                      vz += iz * invMass;
+                      // torque = r x impulse
+                      wx += (ry * iz - rz * iy) * invI;
+                      wy += (rz * ix - rx * iz) * invI;
+                      wz += (rx * iy - ry * ix) * invI;
+                  }
+              }
+
+              private static final int MAX_CONTACTS = 24;
+
+              public static void step(Level level, RigidBody body, float dt) {
+                  body.lastImpactSpeed = 0.0F;
+                  body.onGround = false;
+
+                  int subSteps = 2;
+                  float subDt = dt / (float) subSteps;
+
+                  BlockPos.MutableBlockPos mPos = new BlockPos.MutableBlockPos();
+                  BlockPos.MutableBlockPos nPos = new BlockPos.MutableBlockPos();
+
+                  float[] cRx = new float[MAX_CONTACTS];
+                  float[] cRy = new float[MAX_CONTACTS];
+                  float[] cRz = new float[MAX_CONTACTS];
+                  float[] cNx = new float[MAX_CONTACTS];
+                  float[] cNy = new float[MAX_CONTACTS];
+                  float[] cNz = new float[MAX_CONTACTS];
+                  float[] cPen = new float[MAX_CONTACTS];
+
+                  Vector3f localVec = new Vector3f();
+                  Quaternionf dq = new Quaternionf();
+                  Quaternionf nextQ = new Quaternionf();
+
+                  float invMass = 1.0F / Math.max(0.2F, body.mass);
+                  float invI = 3.2F / (Math.max(0.2F, body.mass) * (body.hx * body.hx + body.hy * body.hy + body.hz * body.hz));
+
+                  for (int step = 0; step < subSteps; step++) {
+                      // 1. Gravity & Fluid Buoyancy
+                      mPos.set(Mth.floor(body.x), Mth.floor(body.y), Mth.floor(body.z));
+                      FluidState fluid = level.getFluidState(mPos);
+                      if (!fluid.isEmpty()) {
+                          body.inWater = true;
+                          float fluidHeight = fluid.getHeight(level, mPos);
+                          double surfaceY = mPos.getY() + fluidHeight;
+                          float sub = Mth.clamp((float) (surfaceY - (body.y - body.hy)) / (2.0F * body.hy), 0.0F, 1.0F);
+                          float ay = -0.04F + (0.04F * body.buoyancy * sub);
+                          body.vy += ay * subDt;
+
+                          Vec3 flow = fluid.getFlow(level, mPos);
+                          body.vx += (float) flow.x * 0.018F * subDt;
+                          body.vz += (float) flow.z * 0.018F * subDt;
+
+                          // Gentle bobbing wave torque on surface
+                          if (sub > 0.1F && sub < 0.95F) {
+                              float wave = (float) Math.sin((body.x * 1.7 + body.z * 1.3 + level.getGameTime() * 0.12)) * 0.008F;
+                              body.wx += wave * subDt;
+                              body.wz -= wave * 0.7F * subDt;
+                          }
+
+                          float linDrag = (float) Math.pow(0.84, subDt);
+                          float angDrag = (float) Math.pow(0.80, subDt);
+                          body.vx *= linDrag;
+                          body.vy *= linDrag;
+                          body.vz *= linDrag;
+                          body.wx *= angDrag;
+                          body.wy *= angDrag;
+                          body.wz *= angDrag;
+                      } else {
+                          body.inWater = false;
+                          body.vy -= 0.04F * subDt;
+                          float linDrag = (float) Math.pow(0.993, subDt);
+                          float angDrag = (float) Math.pow(0.986, subDt);
+                          body.vx *= linDrag;
+                          body.vy *= linDrag;
+                          body.vz *= linDrag;
+                          body.wx *= angDrag;
+                          body.wy *= angDrag;
+                          body.wz *= angDrag;
+                      }
+
+                      // 2. Integrate linear position
+                      body.x += body.vx * subDt;
+                      body.y += body.vy * subDt;
+                      body.z += body.vz * subDt;
+
+                      // 3. Integrate arbitrary 3D Quaternion orientation (world-space angular velocity)
+                      float wMag = (float) Math.sqrt(body.wx * body.wx + body.wy * body.wy + body.wz * body.wz);
+                      if (wMag > 1.0e-5F) {
+                          float angle = wMag * subDt;
+                          dq.fromAxisAngleRad(body.wx / wMag, body.wy / wMag, body.wz / wMag, angle);
+                          dq.mul(body.rot, nextQ);
+                          body.rot.set(nextQ).normalize();
+                      }
+
+                      // 4. Sample OBB 8 corners (+ 6 face centers if full-sized block)
+                      int numContacts = 0;
+                      float maxPushPosX = 0, maxPushNegX = 0;
+                      float maxPushPosY = 0, maxPushNegY = 0;
+                      float maxPushPosZ = 0, maxPushNegZ = 0;
+
+                      int sampleCount = body.highPrecision ? 14 : 8;
+                      for (int i = 0; i < sampleCount && numContacts < MAX_CONTACTS; i++) {
+                          float lx, ly, lz;
+                          if (i < 8) {
+                              lx = ((i & 1) == 0 ? -body.hx : body.hx);
+                              ly = ((i & 2) == 0 ? -body.hy : body.hy);
+                              lz = ((i & 4) == 0 ? -body.hz : body.hz);
+                          } else {
+                              int f = i - 8;
+                              lx = (f == 0 ? body.hx : (f == 1 ? -body.hx : 0));
+                              ly = (f == 2 ? body.hy : (f == 3 ? -body.hy : 0));
+                              lz = (f == 4 ? body.hz : (f == 5 ? -body.hz : 0));
+                          }
+
+                          localVec.set(lx, ly, lz);
+                          body.rot.transform(localVec);
+
+                          double px = body.x + localVec.x;
+                          double py = body.y + localVec.y;
+                          double pz = body.z + localVec.z;
+
+                          int bx = Mth.floor(px);
+                          int by = Mth.floor(py);
+                          int bz = Mth.floor(pz);
+                          mPos.set(bx, by, bz);
+
+                          BlockState bs = level.getBlockState(mPos);
+                          if (bs.isAir()) continue;
+
+                          VoxelShape shape = bs.getCollisionShape(level, mPos);
+                          if (shape.isEmpty()) continue;
+
+                          if (shape == Shapes.block()) {
+                              numContacts = testBoxContact(
+                                  level, nPos, bx, by, bz,
+                                  bx, by, bz, bx + 1.0, by + 1.0, bz + 1.0,
+                                  px, py, pz, localVec.x, localVec.y, localVec.z,
+                                  cRx, cRy, cRz, cNx, cNy, cNz, cPen, numContacts
+                              );
+                          } else {
+                              List<AABB> boxes = shape.toAabbs();
+                              for (int b = 0; b < boxes.size() && numContacts < MAX_CONTACTS; b++) {
+                                  AABB box = boxes.get(b);
+                                  numContacts = testBoxContact(
+                                      level, nPos, bx, by, bz,
+                                      bx + box.minX, by + box.minY, bz + box.minZ,
+                                      bx + box.maxX, by + box.maxY, bz + box.maxZ,
+                                      px, py, pz, localVec.x, localVec.y, localVec.z,
+                                      cRx, cRy, cRz, cNx, cNy, cNz, cPen, numContacts
+                                  );
+                              }
+                          }
+                      }
+
+                      // 5. Resolve contacts (positional correction + sequential impulse & friction torque)
+                      if (numContacts > 0) {
+                          for (int c = 0; c < numContacts; c++) {
+                              float pen = cPen[c];
+                              float nx = cNx[c], ny = cNy[c], nz = cNz[c];
+                              if (nx > 0.5F) maxPushPosX = Math.max(maxPushPosX, pen);
+                              else if (nx < -0.5F) maxPushNegX = Math.max(maxPushNegX, pen);
+                              if (ny > 0.5F) {
+                                  maxPushPosY = Math.max(maxPushPosY, pen);
+                                  body.onGround = true;
+                              } else if (ny < -0.5F) {
+                                  maxPushNegY = Math.max(maxPushNegY, pen);
+                              }
+                              if (nz > 0.5F) maxPushPosZ = Math.max(maxPushPosZ, pen);
+                              else if (nz < -0.5F) maxPushNegZ = Math.max(maxPushNegZ, pen);
+                          }
+
+                          body.x += (maxPushPosX - maxPushNegX) * 0.82;
+                          body.y += (maxPushPosY - maxPushNegY) * 0.85;
+                          body.z += (maxPushPosZ - maxPushNegZ) * 0.82;
+
+                          int iterations = numContacts > 1 ? 2 : 1;
+                          float relax = numContacts > 3 ? 0.62F : 0.85F;
+
+                          for (int iter = 0; iter < iterations; iter++) {
+                              for (int c = 0; c < numContacts; c++) {
+                                  float rx = cRx[c], ry = cRy[c], rz = cRz[c];
+                                  float nx = cNx[c], ny = cNy[c], nz = cNz[c];
+
+                                  // Velocity at contact point: v_c = v + w x r
+                                  float vcx = body.vx + (body.wy * rz - body.wz * ry);
+                                  float vcy = body.vy + (body.wz * rx - body.wx * rz);
+                                  float vcz = body.vz + (body.wx * ry - body.wy * rx);
+
+                                  float vn = vcx * nx + vcy * ny + vcz * nz;
+                                  if (vn >= 0.0F) continue;
+
+                                  if (-vn > body.lastImpactSpeed) {
+                                      body.lastImpactSpeed = -vn;
+                                  }
+
+                                  float e = (-vn > 0.09F) ? body.restitution : 0.0F;
+
+                                  // r x n
+                                  float rcnX = ry * nz - rz * ny;
+                                  float rcnY = rz * nx - rx * nz;
+                                  float rcnZ = rx * ny - ry * nx;
+                                  float rcnSq = rcnX * rcnX + rcnY * rcnY + rcnZ * rcnZ;
+
+                                  float denom = invMass + rcnSq * invI;
+                                  float j = (-(1.0F + e) * vn / denom) * relax;
+
+                                  float jx = nx * j;
+                                  float jy = ny * j;
+                                  float jz = nz * j;
+
+                                  body.vx += jx * invMass;
+                                  body.vy += jy * invMass;
+                                  body.vz += jz * invMass;
+                                  body.wx += (ry * jz - rz * jy) * invI;
+                                  body.wy += (rz * jx - rx * jz) * invI;
+                                  body.wz += (rx * jy - ry * jx) * invI;
+
+                                  // Recompute contact velocity for tangential friction impulse
+                                  vcx = body.vx + (body.wy * rz - body.wz * ry);
+                                  vcy = body.vy + (body.wz * rx - body.wx * rz);
+                                  vcz = body.vz + (body.wx * ry - body.wy * rx);
+                                  float vn2 = vcx * nx + vcy * ny + vcz * nz;
+
+                                  float vtx = vcx - nx * vn2;
+                                  float vty = vcy - ny * vn2;
+                                  float vtz = vcz - nz * vn2;
+                                  float vtSq = vtx * vtx + vty * vty + vtz * vtz;
+
+                                  if (vtSq > 1.0e-6F) {
+                                      float vtMag = (float) Math.sqrt(vtSq);
+                                      float tx = vtx / vtMag;
+                                      float ty = vty / vtMag;
+                                      float tz = vtz / vtMag;
+
+                                      float rctX = ry * tz - rz * ty;
+                                      float rctY = rz * tx - rx * tz;
+                                      float rctZ = rx * ty - ry * tx;
+                                      float rctSq = rctX * rctX + rctY * rctY + rctZ * rctZ;
+
+                                      float denomT = invMass + rctSq * invI;
+                                      float jt = (-vtMag / denomT) * relax;
+                                      float maxF = j * body.friction;
+                                      jt = Mth.clamp(jt, -maxF, maxF);
+
+                                      float fjx = tx * jt;
+                                      float fjy = ty * jt;
+                                      float fjz = tz * jt;
+
+                                      body.vx += fjx * invMass;
+                                      body.vy += fjy * invMass;
+                                      body.vz += fjz * invMass;
+                                      body.wx += (ry * fjz - rz * fjy) * invI;
+                                      body.wy += (rz * fjx - rx * fjz) * invI;
+                                      body.wz += (rx * fjy - ry * fjx) * invI;
+                                  }
+                              }
+                          }
+                      }
+
+                      // 6. Calm micro-jitter when nearly stopped on ground (preserving arbitrary angle!)
+                      if (body.onGround) {
+                          float linSq = body.vx * body.vx + body.vy * body.vy + body.vz * body.vz;
+                          float angSq = body.wx * body.wx + body.wy * body.wy + body.wz * body.wz;
+                          if (linSq < 0.0012F && angSq < 0.0025F) {
+                              body.vx *= 0.80F;
+                              body.vz *= 0.80F;
+                              body.wx *= 0.78F;
+                              body.wy *= 0.78F;
+                              body.wz *= 0.78F;
+                          }
+                      }
+
+                      sanitize(body);
+                  }
+              }
+
+              private static int testBoxContact(
+                  Level level, BlockPos.MutableBlockPos nPos, int bx, int by, int bz,
+                  double minX, double minY, double minZ, double maxX, double maxY, double maxZ,
+                  double px, double py, double pz, float rx, float ry, float rz,
+                  float[] cRx, float[] cRy, float[] cRz,
+                  float[] cNx, float[] cNy, float[] cNz, float[] cPen,
+                  int numContacts
+              ) {
+                  if (px <= minX || px >= maxX || py <= minY || py >= maxY || pz <= minZ || pz >= maxZ) {
+                      return numContacts;
+                  }
+
+                  float dPosY = (float) (maxY - py);
+                  float dNegY = (float) (py - minY);
+                  float dPosX = (float) (maxX - px);
+                  float dNegX = (float) (px - minX);
+                  float dPosZ = (float) (maxZ - pz);
+                  float dNegZ = (float) (pz - minZ);
+
+                  float bestPen = Float.MAX_VALUE;
+                  float bestNx = 0, bestNy = 1, bestNz = 0;
+
+                  // Prefer pushing out through open neighbor faces to avoid catching on flat floor seams
+                  if (dPosY < bestPen && !isFullSolid(level, nPos, bx, by + 1, bz)) {
+                      bestPen = dPosY; bestNx = 0; bestNy = 1; bestNz = 0;
+                  }
+                  if (dNegY < bestPen && !isFullSolid(level, nPos, bx, by - 1, bz)) {
+                      bestPen = dNegY; bestNx = 0; bestNy = -1; bestNz = 0;
+                  }
+                  if (dPosX < bestPen && !isFullSolid(level, nPos, bx + 1, by, bz)) {
+                      bestPen = dPosX; bestNx = 1; bestNy = 0; bestNz = 0;
+                  }
+                  if (dNegX < bestPen && !isFullSolid(level, nPos, bx - 1, by, bz)) {
+                      bestPen = dNegX; bestNx = -1; bestNy = 0; bestNz = 0;
+                  }
+                  if (dPosZ < bestPen && !isFullSolid(level, nPos, bx, by, bz + 1)) {
+                      bestPen = dPosZ; bestNx = 0; bestNy = 0; bestNz = 1;
+                  }
+                  if (dNegZ < bestPen && !isFullSolid(level, nPos, bx, by, bz - 1)) {
+                      bestPen = dNegZ; bestNx = 0; bestNy = 0; bestNz = -1;
+                  }
+
+                  if (bestPen == Float.MAX_VALUE) {
+                      bestPen = dPosY;
+                      bestNx = 0; bestNy = 1; bestNz = 0;
+                  }
+
+                  cRx[numContacts] = rx;
+                  cRy[numContacts] = ry;
+                  cRz[numContacts] = rz;
+                  cNx[numContacts] = bestNx;
+                  cNy[numContacts] = bestNy;
+                  cNz[numContacts] = bestNz;
+                  cPen[numContacts] = Math.min(bestPen, 0.35F);
+                  return numContacts + 1;
+              }
+
+              private static boolean isFullSolid(Level level, BlockPos.MutableBlockPos pos, int x, int y, int z) {
+                  pos.set(x, y, z);
+                  BlockState bs = level.getBlockState(pos);
+                  return !bs.isAir() && bs.getCollisionShape(level, pos) == Shapes.block();
+              }
+
+              private static void sanitize(RigidBody b) {
+                  float maxLin = 2.6F;
+                  float maxAng = 1.15F;
+                  if (!Float.isFinite(b.vx)) b.vx = 0;
+                  if (!Float.isFinite(b.vy)) b.vy = 0;
+                  if (!Float.isFinite(b.vz)) b.vz = 0;
+                  if (!Float.isFinite(b.wx)) b.wx = 0;
+                  if (!Float.isFinite(b.wy)) b.wy = 0;
+                  if (!Float.isFinite(b.wz)) b.wz = 0;
+                  b.vx = Mth.clamp(b.vx, -maxLin, maxLin);
+                  b.vy = Mth.clamp(b.vy, -maxLin, maxLin);
+                  b.vz = Mth.clamp(b.vz, -maxLin, maxLin);
+                  b.wx = Mth.clamp(b.wx, -maxAng, maxAng);
+                  b.wy = Mth.clamp(b.wy, -maxAng, maxAng);
+                  b.wz = Mth.clamp(b.wz, -maxAng, maxAng);
+                  if (!Float.isFinite(b.rot.x) || !Float.isFinite(b.rot.y) || !Float.isFinite(b.rot.z) || !Float.isFinite(b.rot.w)) {
+                      b.rot.identity();
+                  }
+              }
+          }
+          EOF
+
+          cat << 'EOF' > src/main/java/com/fluidphysics/entity/FluidBlockEntity.java
+          package com.fluidphysics.entity;
+
+          import com.fluidphysics.FluidPhysicsMod;
+          import com.fluidphysics.network.ModNetwork;
+          import com.fluidphysics.physics.OBBPhysicsSolver;
+          import com.fluidphysics.physics.PhysicsConfig;
+          import net.minecraft.core.BlockPos;
+          import net.minecraft.core.registries.Registries;
+          import net.minecraft.nbt.CompoundTag;
+          import net.minecraft.nbt.NbtUtils;
+          import net.minecraft.network.protocol.Packet;
+          import net.minecraft.network.protocol.game.ClientGamePacketListener;
+          import net.minecraft.network.syncher.EntityDataAccessor;
+          import net.minecraft.network.syncher.EntityDataSerializers;
+          import net.minecraft.network.syncher.SynchedEntityData;
+          import net.minecraft.server.level.ServerLevel;
+          import net.minecraft.sounds.SoundSource;
+          import net.minecraft.util.Mth;
+          import net.minecraft.world.entity.Entity;
+          import net.minecraft.world.entity.EntityType;
+          import net.minecraft.world.entity.LivingEntity;
+          import net.minecraft.world.item.ItemStack;
+          import net.minecraft.world.level.Level;
+          import net.minecraft.world.level.block.Block;
+          import net.minecraft.world.level.block.Blocks;
+          import net.minecraft.world.level.block.SoundType;
+          import net.minecraft.world.level.block.state.BlockState;
+          import net.minecraft.world.phys.Vec3;
+          import net.minecraftforge.network.NetworkHooks;
+          import org.joml.Quaternionf;
+
+          import java.util.List;
+
+          public class FluidBlockEntity extends Entity {
+              public static final int MODE_FALLING = 0;
+              public static final int MODE_PLACEMENT_SETTLE = 1;
+              public static final int MODE_EXPLOSION_DEBRIS = 2;
+
+              private static final EntityDataAccessor<Integer> DATA_BLOCK_ID =
+                  SynchedEntityData.defineId(FluidBlockEntity.class, EntityDataSerializers.INT);
+              private static final EntityDataAccessor<Float> DATA_QX =
+                  SynchedEntityData.defineId(FluidBlockEntity.class, EntityDataSerializers.FLOAT);
+              private static final EntityDataAccessor<Float> DATA_QY =
+                  SynchedEntityData.defineId(FluidBlockEntity.class, EntityDataSerializers.FLOAT);
+              private static final EntityDataAccessor<Float> DATA_QZ =
+                  SynchedEntityData.defineId(FluidBlockEntity.class, EntityDataSerializers.FLOAT);
+              private static final EntityDataAccessor<Float> DATA_QW =
+                  SynchedEntityData.defineId(FluidBlockEntity.class, EntityDataSerializers.FLOAT);
+              private static final EntityDataAccessor<Integer> DATA_MODE =
+                  SynchedEntityData.defineId(FluidBlockEntity.class, EntityDataSerializers.INT);
+              private static final EntityDataAccessor<BlockPos> DATA_TARGET_POS =
+                  SynchedEntityData.defineId(FluidBlockEntity.class, EntityDataSerializers.BLOCK_POS);
+
+              public final OBBPhysicsSolver.RigidBody body = new OBBPhysicsSolver.RigidBody();
+              private boolean dropItem = true;
+              private boolean settleAsBlock = true;
+              private int age = 0;
+              private int restTicks = 0;
+              private int bounceCooldown = 0;
+
+              // Placement settle animation state
+              private double startOffsetX, startOffsetY, startOffsetZ;
+              private float tiltAxisX = 1.0F, tiltAxisZ = 0.0F, startTiltAngle = 0.35F;
+
+              // Client smooth interpolation state
+              private final Quaternionf prevRenderQuat = new Quaternionf();
+              private final Quaternionf currRenderQuat = new Quaternionf();
+              private boolean quatInitialized = false;
+              private double lerpTargetX, lerpTargetY, lerpTargetZ;
+              private int lerpSteps = 0;
+
+              public FluidBlockEntity(EntityType<? extends FluidBlockEntity> type, Level level) {
+                  super(type, level);
+                  this.blocksBuilding = false;
+                  this.body.hx = 0.50F;
+                  this.body.hy = 0.50F;
+                  this.body.hz = 0.50F;
+                  this.body.highPrecision = true;
+              }
+
+              public static FluidBlockEntity createFalling(
+                  ServerLevel level, double centerX, double centerY, double centerZ,
+                  BlockState state, Vec3 vel, Vec3 angVel, boolean dropItem
+              ) {
+                  FluidBlockEntity e = new FluidBlockEntity(FluidPhysicsMod.FLUID_BLOCK.get(), level);
+                  e.setBlockState(state);
+                  e.setMode(MODE_FALLING);
+                  e.dropItem = dropItem;
+                  e.settleAsBlock = true;
+                  e.initBody(centerX, centerY, centerZ, vel, angVel, state);
+                  e.syncBodyToEntity();
+                  return e;
+              }
+
+              public static FluidBlockEntity createPlacementSettle(
+                  ServerLevel level, BlockPos targetPos, BlockState state, Vec3 approachOffset
+              ) {
+                  FluidBlockEntity e = new FluidBlockEntity(FluidPhysicsMod.FLUID_BLOCK.get(), level);
+                  e.setBlockState(state);
+                  e.setMode(MODE_PLACEMENT_SETTLE);
+                  e.setTargetPos(targetPos);
+                  e.dropItem = true;
+                  e.settleAsBlock = true;
+
+                  e.startOffsetX = approachOffset.x;
+                  e.startOffsetY = approachOffset.y;
+                  e.startOffsetZ = approachOffset.z;
+
+                  float angle = (level.random.nextFloat() * 0.20F) + 0.22F;
+                  float dir = level.random.nextFloat() * ((float) Math.PI * 2.0F);
+                  e.tiltAxisX = Mth.cos(dir);
+                  e.tiltAxisZ = Mth.sin(dir);
+                  e.startTiltAngle = angle;
+
+                  double cx = targetPos.getX() + 0.5 + e.startOffsetX;
+                  double cy = targetPos.getY() + 0.5 + e.startOffsetY;
+                  double cz = targetPos.getZ() + 0.5 + e.startOffsetZ;
+                  e.body.x = cx;
+                  e.body.y = cy;
+                  e.body.z = cz;
+                  e.body.rot.fromAxisAngleRad(e.tiltAxisX, 0.15F, e.tiltAxisZ, angle).normalize();
+                  e.syncBodyToEntity();
+                  return e;
+              }
+
+              public static FluidBlockEntity createExplosionDebris(
+                  ServerLevel level, double centerX, double centerY, double centerZ,
+                  BlockState state, Vec3 vel, Vec3 angVel, boolean settleIntoWorld
+              ) {
+                  FluidBlockEntity e = new FluidBlockEntity(FluidPhysicsMod.FLUID_BLOCK.get(), level);
+                  e.setBlockState(state);
+                  e.setMode(MODE_EXPLOSION_DEBRIS);
+                  e.dropItem = false;
+                  e.settleAsBlock = settleIntoWorld;
+                  e.initBody(centerX, centerY, centerZ, vel, angVel, state);
+                  e.syncBodyToEntity();
+                  return e;
+              }
+
+              private void initBody(double cx, double cy, double cz, Vec3 vel, Vec3 angVel, BlockState state) {
+                  body.x = cx;
+                  body.y = cy;
+                  body.z = cz;
+                  body.vx = (float) vel.x;
+                  body.vy = (float) vel.y;
+                  body.vz = (float) vel.z;
+                  body.wx = (float) angVel.x;
+                  body.wy = (float) angVel.y;
+                  body.wz = (float) angVel.z;
+                  body.mass = PhysicsConfig.getMass(state);
+                  body.restitution = PhysicsConfig.getRestitution(state);
+                  body.friction = PhysicsConfig.getFriction(state);
+                  body.buoyancy = PhysicsConfig.getBuoyancy(state);
+                  body.rot.identity();
+              }
+
+              private void syncBodyToEntity() {
+                  this.setPos(body.x, body.y - 0.5, body.z);
+                  this.setDeltaMovement(body.vx, body.vy, body.vz);
+                  this.entityData.set(DATA_QX, body.rot.x);
+                  this.entityData.set(DATA_QY, body.rot.y);
+                  this.entityData.set(DATA_QZ, body.rot.z);
+                  this.entityData.set(DATA_QW, body.rot.w);
+              }
+
+              @Override
+              protected void defineSynchedData() {
+                  this.entityData.define(DATA_BLOCK_ID, Block.getId(Blocks.SAND.defaultBlockState()));
+                  this.entityData.define(DATA_QX, 0.0F);
+                  this.entityData.define(DATA_QY, 0.0F);
+                  this.entityData.define(DATA_QZ, 0.0F);
+                  this.entityData.define(DATA_QW, 1.0F);
+                  this.entityData.define(DATA_MODE, MODE_FALLING);
+                  this.entityData.define(DATA_TARGET_POS, BlockPos.ZERO);
+              }
+
+              public BlockState getBlockState() {
+                  BlockState st = Block.stateById(this.entityData.get(DATA_BLOCK_ID));
+                  return st.isAir() ? Blocks.SAND.defaultBlockState() : st;
+              }
+
+              public void setBlockState(BlockState state) {
+                  this.entityData.set(DATA_BLOCK_ID, Block.getId(state));
+              }
+
+              public int getMode() {
+                  return this.entityData.get(DATA_MODE);
+              }
+
+              public void setMode(int mode) {
+                  this.entityData.set(DATA_MODE, mode);
+              }
+
+              public BlockPos getTargetPos() {
+                  return this.entityData.get(DATA_TARGET_POS);
+              }
+
+              public void setTargetPos(BlockPos pos) {
+                  this.entityData.set(DATA_TARGET_POS, pos);
+              }
+
+              public Quaternionf getInterpolatedOrientation(float partialTick) {
+                  Quaternionf out = new Quaternionf();
+                  this.prevRenderQuat.slerp(this.currRenderQuat, partialTick, out);
+                  return out.normalize();
+              }
+
+              @Override
+              public void lerpTo(double x, double y, double z, float yRot, float xRot, int steps, boolean teleport) {
+                  this.lerpTargetX = x;
+                  this.lerpTargetY = y;
+                  this.lerpTargetZ = z;
+                  this.lerpSteps = Math.max(1, Math.min(steps, 3));
+              }
+
+              @Override
+              public void tick() {
+                  super.tick();
+                  this.age++;
+
+                  if (this.level().isClientSide()) {
+                      this.xo = this.getX();
+                      this.yo = this.getY();
+                      this.zo = this.getZ();
+                      if (this.lerpSteps > 0) {
+                          double nx = this.getX() + (this.lerpTargetX - this.getX()) / (double) this.lerpSteps;
+                          double ny = this.getY() + (this.lerpTargetY - this.getY()) / (double) this.lerpSteps;
+                          double nz = this.getZ() + (this.lerpTargetZ - this.getZ()) / (double) this.lerpSteps;
+                          this.lerpSteps--;
+                          this.setPos(nx, ny, nz);
+                      }
+                      this.prevRenderQuat.set(this.currRenderQuat);
+                      this.currRenderQuat.set(
+                          this.entityData.get(DATA_QX),
+                          this.entityData.get(DATA_QY),
+                          this.entityData.get(DATA_QZ),
+                          this.entityData.get(DATA_QW)
+                      ).normalize();
+                      if (!this.quatInitialized) {
+                          this.prevRenderQuat.set(this.currRenderQuat);
+                          this.quatInitialized = true;
+                      }
+                      return;
+                  }
+
+                  ServerLevel sLevel = (ServerLevel) this.level();
+                  if (this.getY() < sLevel.getMinBuildHeight() - 16) {
+                      this.discard();
+                      return;
+                  }
+
+                  int mode = getMode();
+                  if (mode == MODE_PLACEMENT_SETTLE) {
+                      tickPlacementSettle(sLevel);
+                  } else {
+                      tickRigidBody(sLevel, mode);
+                  }
+              }
+
+              private void tickPlacementSettle(ServerLevel sLevel) {
+                  BlockPos target = getTargetPos();
+                  int duration = 5;
+                  float t = Mth.clamp((float) this.age / (float) duration, 0.0F, 1.0F);
+
+                  // Fast gravity drop-in with subtle elastic overshoot
+                  float ease = 1.0F - (1.0F - t) * (1.0F - t) * (1.0F - t);
+                  float wobble = (float) Math.exp(-t * 3.5) * Mth.cos(t * 9.0F);
+                  float remaining = 1.0F - ease;
+
+                  body.x = target.getX() + 0.5 + startOffsetX * remaining;
+                  body.y = target.getY() + 0.5 + startOffsetY * remaining;
+                  body.z = target.getZ() + 0.5 + startOffsetZ * remaining;
+
+                  float angle = startTiltAngle * wobble;
+                  if (Math.abs(angle) > 0.002F) {
+                      body.rot.fromAxisAngleRad(tiltAxisX, 0.1F, tiltAxisZ, angle).normalize();
+                  } else {
+                      body.rot.identity();
+                  }
+                  syncBodyToEntity();
+
+                  if (this.age >= duration) {
+                      BlockState state = getBlockState();
+                      if (sLevel.getBlockState(target).canBeReplaced()) {
+                          sLevel.setBlock(target, state, 3);
+                          SoundType sound = state.getSoundType();
+                          sLevel.playSound(
+                              null, target.getX() + 0.5, target.getY() + 0.5, target.getZ() + 0.5,
+                              sound.getPlaceSound(), SoundSource.BLOCKS, 0.85F, 0.92F + sLevel.random.nextFloat() * 0.16F
+                          );
+                          ModNetwork.sendPlaceImpact(sLevel, target, state);
+                      } else if (dropItem) {
+                          Block.popResource(sLevel, target, new ItemStack(state.getBlock()));
+                      }
+                      this.discard();
+                  }
+              }
+
+              private void tickRigidBody(ServerLevel sLevel, int mode) {
+                  BlockState state = getBlockState();
+                  if (bounceCooldown > 0) bounceCooldown--;
+
+                  // Keep material parameters in sync (important after chunk reload)
+                  body.mass = PhysicsConfig.getMass(state);
+                  body.restitution = PhysicsConfig.getRestitution(state);
+                  body.friction = PhysicsConfig.getFriction(state);
+                  body.buoyancy = PhysicsConfig.getBuoyancy(state);
+
+                  // Step full 6-DOF OBB physics (free arbitrary 3D rotation!)
+                  OBBPhysicsSolver.step(sLevel, body, 1.0F);
+
+                  // Impact effects (sound + interactive particles + explosion shatter)
+                  if (body.lastImpactSpeed > 0.22F && bounceCooldown == 0) {
+                      bounceCooldown = 3;
+                      SoundType sound = state.getSoundType();
+                      float vol = Mth.clamp(body.lastImpactSpeed * 1.1F, 0.25F, 1.1F);
+                      float pitch = 0.82F + sLevel.random.nextFloat() * 0.28F;
+                      sLevel.playSound(null, body.x, body.y, body.z, sound.getFallSound(), SoundSource.BLOCKS, vol, pitch);
+                      ModNetwork.sendBounceParticles(sLevel, body.x, body.y - 0.35, body.z, state, body.lastImpactSpeed);
+
+                      // Fragile explosion blocks shatter into 3D debris on violent impacts
+                      if (mode == MODE_EXPLOSION_DEBRIS && !settleAsBlock && body.lastImpactSpeed > 0.52F) {
+                          ModNetwork.sendBlockBreak(sLevel, BlockPos.containing(body.x, body.y, body.z), state, body.vx, body.vy, body.vz);
+                          this.discard();
+                          return;
+                      }
+                  }
+
+                  // Player & mob collision: kick tumbling blocks OR get bonked by heavy falling blocks!
+                  List<Entity> nearby = sLevel.getEntities(this, this.getBoundingBox().inflate(0.28), e -> e instanceof LivingEntity && e.isAlive());
+                  float speed = (float) Math.sqrt(body.vx * body.vx + body.vy * body.vy + body.vz * body.vz);
+                  for (Entity ent : nearby) {
+                      Vec3 entVel = ent.getDeltaMovement();
+                      double dx = body.x - ent.getX();
+                      double dy = body.y - (ent.getY() + ent.getBbHeight() * 0.5);
+                      double dz = body.z - ent.getZ();
+                      double distSq = dx * dx + dy * dy + dz * dz;
+                      if (distSq < 0.001) continue;
+                      double dist = Math.sqrt(distSq);
+
+                      // Heavy falling impact damage
+                      if (speed > 0.45F && body.vy < -0.25F && body.mass >= 1.5F && this.age > 4) {
+                          float dmg = Mth.clamp(speed * body.mass * 3.8F, 2.0F, 18.0F);
+                          boolean isAnvil = state.getSoundType() == SoundType.ANVIL;
+                          ent.hurt(isAnvil ? this.damageSources().anvil(this) : this.damageSources().fallingBlock(this), dmg);
+                          body.vy = Math.abs(body.vy) * 0.35F + 0.12F;
+                          body.wx += (sLevel.random.nextFloat() - 0.5F) * 0.5F;
+                          body.wz += (sLevel.random.nextFloat() - 0.5F) * 0.5F;
+                      } else {
+                          // Player/mob kicks or bumps the physics block!
+                          double entSpeed = entVel.length();
+                          if (entSpeed > 0.04) {
+                              float push = (float) Math.min(0.45, entSpeed * 0.85 + 0.08);
+                              body.vx += (float) ((dx / dist) * push + entVel.x * 0.55);
+                              body.vy += 0.06F;
+                              body.vz += (float) ((dz / dist) * push + entVel.z * 0.55);
+                              body.wx += (float) (-(dz / dist) * push * 0.9);
+                              body.wz += (float) ((dx / dist) * push * 0.9);
+                              this.restTicks = 0;
+                          }
+                      }
+                  }
+
+                  float angSpeed = (float) Math.sqrt(body.wx * body.wx + body.wy * body.wy + body.wz * body.wz);
+                  if (body.onGround && speed < 0.055F && angSpeed < 0.065F) {
+                      restTicks++;
+                      // Only smoothly level out during final 6 ticks right before becoming a solid grid block
+                      if (settleAsBlock && restTicks >= 9) {
+                          Quaternionf identity = new Quaternionf();
+                          body.rot.slerp(identity, 0.32F).normalize();
+                      }
+                  } else {
+                      restTicks = 0;
+                  }
+
+                  syncBodyToEntity();
+
+                  int maxLife = (mode == MODE_EXPLOSION_DEBRIS) ? 140 : 220;
+                  if (restTicks >= 15 || this.age >= maxLife) {
+                      finishRigidBody(sLevel, state);
+                  }
+              }
+
+              private void finishRigidBody(ServerLevel sLevel, BlockState state) {
+                  BlockPos placePos = BlockPos.containing(body.x, body.y, body.z);
+                  if (settleAsBlock) {
+                      if (!sLevel.getBlockState(placePos).canBeReplaced() && sLevel.getBlockState(placePos.above()).canBeReplaced()) {
+                          placePos = placePos.above();
+                      }
+                      if (sLevel.getBlockState(placePos).canBeReplaced()) {
+                          sLevel.setBlock(placePos, state, 3);
+                          SoundType sound = state.getSoundType();
+                          sLevel.playSound(
+                              null, placePos.getX() + 0.5, placePos.getY() + 0.5, placePos.getZ() + 0.5,
+                              sound.getPlaceSound(), SoundSource.BLOCKS, 0.8F, 0.95F
+                          );
+                          ModNetwork.sendPlaceImpact(sLevel, placePos, state);
+                      } else if (dropItem) {
+                          Block.popResource(sLevel, placePos, new ItemStack(state.getBlock()));
+                      } else {
+                          ModNetwork.sendBlockBreak(sLevel, placePos, state, 0, 0.1F, 0);
+                      }
+                  } else {
+                      ModNetwork.sendBlockBreak(sLevel, placePos, state, body.vx, 0.15F, body.vz);
+                  }
+                  this.discard();
+              }
+
+              public void wakeUp() {
+                  this.restTicks = 0;
+                  this.body.onGround = false;
+              }
+
+              @Override
+              public boolean isPickable() {
+                  return false;
+              }
+
+              @Override
+              public boolean isAttackable() {
+                  return false;
+              }
+
+              @Override
+              public boolean shouldRenderAtSqrDistance(double distance) {
+                  return distance < 128.0 * 128.0;
+              }
+
+              @Override
+              protected void readAdditionalSaveData(CompoundTag tag) {
+                  if (tag.contains("BlockState")) {
+                      setBlockState(NbtUtils.readBlockState(this.level().holderLookup(Registries.BLOCK), tag.getCompound("BlockState")));
+                  }
+                  setMode(tag.getInt("Mode"));
+                  if (tag.contains("TargetPos")) {
+                      setTargetPos(NbtUtils.readBlockPos(tag.getCompound("TargetPos")));
+                  }
+                  this.dropItem = !tag.contains("DropItem") || tag.getBoolean("DropItem");
+                  this.settleAsBlock = !tag.contains("SettleAsBlock") || tag.getBoolean("SettleAsBlock");
+                  this.age = tag.getInt("Age");
+                  this.body.x = this.getX();
+                  this.body.y = this.getY() + 0.5;
+                  this.body.z = this.getZ();
+                  this.body.vx = (float) this.getDeltaMovement().x;
+                  this.body.vy = (float) this.getDeltaMovement().y;
+                  this.body.vz = (float) this.getDeltaMovement().z;
+                  this.body.wx = tag.getFloat("Wx");
+                  this.body.wy = tag.getFloat("Wy");
+                  this.body.wz = tag.getFloat("Wz");
+                  if (tag.contains("Qw")) {
+                      this.body.rot.set(tag.getFloat("Qx"), tag.getFloat("Qy"), tag.getFloat("Qz"), tag.getFloat("Qw")).normalize();
+                  }
+                  syncBodyToEntity();
+              }
+
+              @Override
+              protected void addAdditionalSaveData(CompoundTag tag) {
+                  tag.put("BlockState", NbtUtils.writeBlockState(getBlockState()));
+                  tag.putInt("Mode", getMode());
+                  tag.put("TargetPos", NbtUtils.writeBlockPos(getTargetPos()));
+                  tag.putBoolean("DropItem", this.dropItem);
+                  tag.putBoolean("SettleAsBlock", this.settleAsBlock);
+                  tag.putInt("Age", this.age);
+                  tag.putFloat("Wx", this.body.wx);
+                  tag.putFloat("Wy", this.body.wy);
+                  tag.putFloat("Wz", this.body.wz);
+                  tag.putFloat("Qx", this.body.rot.x);
+                  tag.putFloat("Qy", this.body.rot.y);
+                  tag.putFloat("Qz", this.body.rot.z);
+                  tag.putFloat("Qw", this.body.rot.w);
+              }
+
+              @Override
+              public Packet<ClientGamePacketListener> getAddEntityPacket() {
+                  return NetworkHooks.getEntitySpawningPacket(this);
+              }
+          }
+          EOF
+
+          cat << 'EOF' > src/main/java/com/fluidphysics/network/ModNetwork.java
+          package com.fluidphysics.network;
+
+          import com.fluidphysics.FluidPhysicsMod;
+          import com.fluidphysics.client.ClientPacketHandler;
+          import net.minecraft.core.BlockPos;
+          import net.minecraft.network.FriendlyByteBuf;
+          import net.minecraft.resources.ResourceLocation;
+          import net.minecraft.server.level.ServerLevel;
+          import net.minecraft.world.level.block.Block;
+          import net.minecraft.world.level.block.state.BlockState;
+          import net.minecraftforge.api.distmarker.Dist;
+          import net.minecraftforge.fml.DistExecutor;
+          import net.minecraftforge.network.NetworkDirection;
+          import net.minecraftforge.network.NetworkEvent;
+          import net.minecraftforge.network.NetworkRegistry;
+          import net.minecraftforge.network.PacketDistributor;
+          import net.minecraftforge.network.simple.SimpleChannel;
+
+          import java.util.Optional;
+          import java.util.function.Supplier;
+
+          public final class ModNetwork {
+              private static final String PROTOCOL = "1";
+              public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
+                  new ResourceLocation(FluidPhysicsMod.MODID, "main"),
+                  () -> PROTOCOL,
+                  PROTOCOL::equals,
+                  PROTOCOL::equals
+              );
+
+              public static void register() {
+                  int id = 0;
+                  CHANNEL.registerMessage(id++, BlockBreakPacket.class, BlockBreakPacket::encode, BlockBreakPacket::decode, BlockBreakPacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+                  CHANNEL.registerMessage(id++, BlockPlaceImpactPacket.class, BlockPlaceImpactPacket::encode, BlockPlaceImpactPacket::decode, BlockPlaceImpactPacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+                  CHANNEL.registerMessage(id++, BounceParticlesPacket.class, BounceParticlesPacket::encode, BounceParticlesPacket::decode, BounceParticlesPacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+                  CHANNEL.registerMessage(id++, ExplosionPhysicsPacket.class, ExplosionPhysicsPacket::encode, ExplosionPhysicsPacket::decode, ExplosionPhysicsPacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+                  CHANNEL.registerMessage(id++, SyncSettingsPacket.class, SyncSettingsPacket::encode, SyncSettingsPacket::decode, SyncSettingsPacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+              }
+
+              public static void sendBlockBreak(ServerLevel level, BlockPos pos, BlockState state, float dx, float dy, float dz) {
+                  CHANNEL.send(
+                      PacketDistributor.NEAR.with(() -> new PacketDistributor.TargetPoint(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, 48.0, level.dimension())),
+                      new BlockBreakPacket(pos, Block.getId(state), dx, dy, dz)
+                  );
+              }
+
+              public static void sendPlaceImpact(ServerLevel level, BlockPos pos, BlockState state) {
+                  CHANNEL.send(
+                      PacketDistributor.NEAR.with(() -> new PacketDistributor.TargetPoint(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, 40.0, level.dimension())),
+                      new BlockPlaceImpactPacket(pos, Block.getId(state))
+                  );
+              }
+
+              public static void sendBounceParticles(ServerLevel level, double x, double y, double z, BlockState state, float intensity) {
+                  CHANNEL.send(
+                      PacketDistributor.NEAR.with(() -> new PacketDistributor.TargetPoint(x, y, z, 44.0, level.dimension())),
+                      new BounceParticlesPacket(x, y, z, Block.getId(state), intensity)
+                  );
+              }
+
+              public static void sendExplosion(ServerLevel level, double x, double y, double z, float radius, int[] sampleBlockIds) {
+                  CHANNEL.send(
+                      PacketDistributor.NEAR.with(() -> new PacketDistributor.TargetPoint(x, y, z, 72.0, level.dimension())),
+                      new ExplosionPhysicsPacket(x, y, z, radius, sampleBlockIds)
+                  );
+              }
+
+              public static void broadcastSettings(boolean fullGravity, boolean placePhysics, int quality, boolean clearAll) {
+                  CHANNEL.send(PacketDistributor.ALL.noArg(), new SyncSettingsPacket(fullGravity, placePhysics, quality, clearAll));
+              }
+
+              public record BlockBreakPacket(BlockPos pos, int stateId, float dx, float dy, float dz) {
+                  public static void encode(BlockBreakPacket msg, FriendlyByteBuf buf) {
+                      buf.writeBlockPos(msg.pos);
+                      buf.writeInt(msg.stateId);
+                      buf.writeFloat(msg.dx);
+                      buf.writeFloat(msg.dy);
+                      buf.writeFloat(msg.dz);
+                  }
+                  public static BlockBreakPacket decode(FriendlyByteBuf buf) {
+                      return new BlockBreakPacket(buf.readBlockPos(), buf.readInt(), buf.readFloat(), buf.readFloat(), buf.readFloat());
+                  }
+                  public static void handle(BlockBreakPacket msg, Supplier<NetworkEvent.Context> ctx) {
+                      ctx.get().enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientPacketHandler.handleBlockBreak(msg)));
+                      ctx.get().setPacketHandled(true);
+                  }
+              }
+
+              public record BlockPlaceImpactPacket(BlockPos pos, int stateId) {
+                  public static void encode(BlockPlaceImpactPacket msg, FriendlyByteBuf buf) {
+                      buf.writeBlockPos(msg.pos);
+                      buf.writeInt(msg.stateId);
+                  }
+                  public static BlockPlaceImpactPacket decode(FriendlyByteBuf buf) {
+                      return new BlockPlaceImpactPacket(buf.readBlockPos(), buf.readInt());
+                  }
+                  public static void handle(BlockPlaceImpactPacket msg, Supplier<NetworkEvent.Context> ctx) {
+                      ctx.get().enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientPacketHandler.handlePlaceImpact(msg)));
+                      ctx.get().setPacketHandled(true);
+                  }
+              }
+
+              public record BounceParticlesPacket(double x, double y, double z, int stateId, float intensity) {
+                  public static void encode(BounceParticlesPacket msg, FriendlyByteBuf buf) {
+                      buf.writeDouble(msg.x);
+                      buf.writeDouble(msg.y);
+                      buf.writeDouble(msg.z);
+                      buf.writeInt(msg.stateId);
+                      buf.writeFloat(msg.intensity);
+                  }
+                  public static BounceParticlesPacket decode(FriendlyByteBuf buf) {
+                      return new BounceParticlesPacket(buf.readDouble(), buf.readDouble(), buf.readDouble(), buf.readInt(), buf.readFloat());
+                  }
+                  public static void handle(BounceParticlesPacket msg, Supplier<NetworkEvent.Context> ctx) {
+                      ctx.get().enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientPacketHandler.handleBounceParticles(msg)));
+                      ctx.get().setPacketHandled(true);
+                  }
+              }
+
+              public record ExplosionPhysicsPacket(double x, double y, double z, float radius, int[] sampleBlockIds) {
+                  public static void encode(ExplosionPhysicsPacket msg, FriendlyByteBuf buf) {
+                      buf.writeDouble(msg.x);
+                      buf.writeDouble(msg.y);
+                      buf.writeDouble(msg.z);
+                      buf.writeFloat(msg.radius);
+                      buf.writeVarIntArray(msg.sampleBlockIds);
+                  }
+                  public static ExplosionPhysicsPacket decode(FriendlyByteBuf buf) {
+                      return new ExplosionPhysicsPacket(buf.readDouble(), buf.readDouble(), buf.readDouble(), buf.readFloat(), buf.readVarIntArray(64));
+                  }
+                  public static void handle(ExplosionPhysicsPacket msg, Supplier<NetworkEvent.Context> ctx) {
+                      ctx.get().enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientPacketHandler.handleExplosion(msg)));
+                      ctx.get().setPacketHandled(true);
+                  }
+              }
+
+              public record SyncSettingsPacket(boolean fullGravity, boolean placePhysics, int quality, boolean clearAll) {
+                  public static void encode(SyncSettingsPacket msg, FriendlyByteBuf buf) {
+                      buf.writeBoolean(msg.fullGravity);
+                      buf.writeBoolean(msg.placePhysics);
+                      buf.writeInt(msg.quality);
+                      buf.writeBoolean(msg.clearAll);
+                  }
+                  public static SyncSettingsPacket decode(FriendlyByteBuf buf) {
+                      return new SyncSettingsPacket(buf.readBoolean(), buf.readBoolean(), buf.readInt(), buf.readBoolean());
+                  }
+                  public static void handle(SyncSettingsPacket msg, Supplier<NetworkEvent.Context> ctx) {
+                      ctx.get().enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientPacketHandler.handleSyncSettings(msg)));
+                      ctx.get().setPacketHandled(true);
+                  }
+              }
+          }
+          EOF
+
+          cat << 'EOF' > src/main/java/com/fluidphysics/events/ServerPhysicsEvents.java
+          package com.fluidphysics.events;
+
+          import com.fluidphysics.entity.FluidBlockEntity;
+          import com.fluidphysics.network.ModNetwork;
+          import com.fluidphysics.physics.PhysicsConfig;
+          import com.mojang.brigadier.CommandDispatcher;
+          import net.minecraft.commands.CommandSourceStack;
+          import net.minecraft.commands.Commands;
+          import net.minecraft.core.BlockPos;
+          import net.minecraft.core.Direction;
+          import net.minecraft.network.chat.Component;
+          import net.minecraft.server.level.ServerLevel;
+          import net.minecraft.world.entity.Entity;
+          import net.minecraft.world.entity.item.FallingBlockEntity;
+          import net.minecraft.world.entity.item.ItemEntity;
+          import net.minecraft.world.entity.player.Player;
+          import net.minecraft.world.level.block.Block;
+          import net.minecraft.world.level.block.Blocks;
+          import net.minecraft.world.level.block.TntBlock;
+          import net.minecraft.world.level.block.state.BlockState;
+          import net.minecraft.world.phys.AABB;
+          import net.minecraft.world.phys.Vec3;
+          import net.minecraftforge.event.RegisterCommandsEvent;
+          import net.minecraftforge.event.TickEvent;
+          import net.minecraftforge.event.entity.EntityJoinLevelEvent;
+          import net.minecraftforge.event.entity.living.LivingDeathEvent;
+          import net.minecraftforge.event.level.BlockEvent;
+          import net.minecraftforge.event.level.ExplosionEvent;
+          import net.minecraftforge.eventbus.api.SubscribeEvent;
+
+          import java.util.ArrayList;
+          import java.util.Collections;
+          import java.util.List;
+
+          public class ServerPhysicsEvents {
+
+              @SubscribeEvent
+              public void onBlockBreak(BlockEvent.BreakEvent event) {
+                  if (!(event.getLevel() instanceof ServerLevel level)) return;
+                  BlockPos pos = event.getPos();
+                  BlockState state = event.getState();
+                  if (state.isAir()) return;
+
+                  Vec3 hitDir = Vec3.ZERO;
+                  Player player = event.getPlayer();
+                  if (player != null) {
+                      hitDir = player.getLookAngle().scale(0.14);
+                  }
+                  ModNetwork.sendBlockBreak(level, pos, state, (float) hitDir.x, (float) hitDir.y, (float) hitDir.z);
+
+                  // Wake up nearby resting FluidBlockEntities
+                  AABB wakeBox = new AABB(pos).inflate(2.0);
+                  for (FluidBlockEntity fbe : level.getEntitiesOfClass(FluidBlockEntity.class, wakeBox)) {
+                      fbe.wakeUp();
+                  }
+
+                  // Full gravity collapse for unsupported column above
+                  if (PhysicsConfig.fullGravity) {
+                      level.getServer().execute(() -> triggerUnsupportedCollapse(level, pos.above(), 0));
+                  }
+              }
+
+              private void triggerUnsupportedCollapse(ServerLevel level, BlockPos pos, int depth) {
+                  if (depth > 14) return;
+                  BlockState state = level.getBlockState(pos);
+                  if (!PhysicsConfig.isSafePhysicsBlock(state, level, pos)) return;
+                  if (!hasNoBottomSupport(level, pos)) return;
+
+                  level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+                  Vec3 randVel = new Vec3(
+                      (level.random.nextDouble() - 0.5) * 0.08,
+                      -0.02,
+                      (level.random.nextDouble() - 0.5) * 0.08
+                  );
+                  Vec3 randAng = new Vec3(
+                      (level.random.nextDouble() - 0.5) * 0.25,
+                      (level.random.nextDouble() - 0.5) * 0.14,
+                      (level.random.nextDouble() - 0.5) * 0.25
+                  );
+                  FluidBlockEntity fbe = FluidBlockEntity.createFalling(
+                      level, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5,
+                      state, randVel, randAng, true
+                  );
+                  level.addFreshEntity(fbe);
+
+                  triggerUnsupportedCollapse(level, pos.above(), depth + 1);
+              }
+
+              @SubscribeEvent
+              public void onBlockPlace(BlockEvent.EntityPlaceEvent event) {
+                  if (!(event.getLevel() instanceof ServerLevel level)) return;
+                  BlockPos pos = event.getPos();
+                  BlockState state = event.getPlacedBlock();
+                  Entity placer = event.getEntity();
+                  boolean sneaking = placer != null && placer.isShiftKeyDown();
+
+                  if (!PhysicsConfig.isSafePhysicsBlock(state, level, pos)) {
+                      ModNetwork.sendPlaceImpact(level, pos, state);
+                      return;
+                  }
+
+                  boolean unsupportedBelow = hasNoBottomSupport(level, pos);
+
+                  // Case 1: Placed over air -> tips off side edge and tumbles freely at ANY 3D angle!
+                  if (unsupportedBelow && (PhysicsConfig.isNaturalGravity(state) || (PhysicsConfig.fullGravity && !sneaking))) {
+                      level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+
+                      // Find horizontal neighbor it was placed against to impart realistic tipping torque
+                      double tipX = 0, tipZ = 0;
+                      for (Direction dir : Direction.Plane.HORIZONTAL) {
+                          BlockPos adj = pos.relative(dir);
+                          if (!level.getBlockState(adj).getCollisionShape(level, adj).isEmpty()) {
+                              tipX -= dir.getStepX();
+                              tipZ -= dir.getStepZ();
+                          }
+                      }
+                      if (tipX == 0 && tipZ == 0) {
+                          tipX = (level.random.nextDouble() - 0.5) * 0.6;
+                          tipZ = (level.random.nextDouble() - 0.5) * 0.6;
+                      } else {
+                          double len = Math.sqrt(tipX * tipX + tipZ * tipZ);
+                          tipX /= len;
+                          tipZ /= len;
+                      }
+
+                      Vec3 vel = new Vec3(tipX * 0.08, -0.02, tipZ * 0.08);
+                      Vec3 ang = new Vec3(tipZ * 0.28 + (level.random.nextDouble() - 0.5) * 0.1, (level.random.nextDouble() - 0.5) * 0.15, -tipX * 0.28 + (level.random.nextDouble() - 0.5) * 0.1);
+
+                      FluidBlockEntity falling = FluidBlockEntity.createFalling(
+                          level, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5,
+                          state, vel, ang, true
+                      );
+                      level.addFreshEntity(falling);
+                      ModNetwork.sendPlaceImpact(level, pos, state);
+                      return;
+                  }
+
+                  // Case 2: Solid placement -> smooth physical drop-in & wobble slam
+                  if (PhysicsConfig.placementPhysics && !sneaking) {
+                      level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+                      Vec3 approach = new Vec3(0, 0.34, 0);
+                      if (placer != null) {
+                          Vec3 fromPlacer = placer.getEyePosition().subtract(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
+                          if (fromPlacer.lengthSqr() > 0.01) {
+                              Vec3 dir = fromPlacer.normalize();
+                              approach = new Vec3(dir.x * 0.14, Math.max(0.24, dir.y * 0.22 + 0.18), dir.z * 0.14);
+                          }
+                      }
+                      FluidBlockEntity settle = FluidBlockEntity.createPlacementSettle(level, pos, state, approach);
+                      level.addFreshEntity(settle);
+                  } else {
+                      ModNetwork.sendPlaceImpact(level, pos, state);
+                  }
+              }
+
+              @SubscribeEvent
+              public void onEntityJoin(EntityJoinLevelEvent event) {
+                  if (!(event.getLevel() instanceof ServerLevel level)) return;
+                  if (event.getEntity() instanceof FallingBlockEntity fbe) {
+                      BlockState state = fbe.getBlockState();
+                      if (state.isAir()) return;
+
+                      // Cancel vanilla rigid grid-locked FallingBlockEntity and replace with our 3D tumbling physics block!
+                      event.setCanceled(true);
+
+                      double cx = fbe.getX();
+                      double cy = fbe.getY() + 0.5;
+                      double cz = fbe.getZ();
+                      Vec3 baseVel = fbe.getDeltaMovement();
+                      Vec3 vel = new Vec3(
+                          baseVel.x + (level.random.nextDouble() - 0.5) * 0.075,
+                          baseVel.y,
+                          baseVel.z + (level.random.nextDouble() - 0.5) * 0.075
+                      );
+                      Vec3 ang = new Vec3(
+                          (level.random.nextDouble() - 0.5) * 0.32,
+                          (level.random.nextDouble() - 0.5) * 0.22,
+                          (level.random.nextDouble() - 0.5) * 0.32
+                      );
+                      boolean shouldDrop = fbe.dropItem;
+
+                      level.getServer().execute(() -> {
+                          FluidBlockEntity fluidBlock = FluidBlockEntity.createFalling(level, cx, cy, cz, state, vel, ang, shouldDrop);
+                          level.addFreshEntity(fluidBlock);
+                      });
+                  }
+              }
+
+              @SubscribeEvent
+              public void onExplosionDetonate(ExplosionEvent.Detonate event) {
+                  if (!(event.getLevel() instanceof ServerLevel level)) return;
+                  Vec3 center = event.getExplosion().getPosition();
+                  List<BlockPos> affected = event.getAffectedBlocks();
+                  if (affected.isEmpty()) return;
+
+                  float radius = Math.max(2.5F, (float) Math.cbrt(affected.size()) * 1.15F);
+
+                  List<BlockPos> candidates = new ArrayList<>();
+                  List<Integer> sampleIds = new ArrayList<>();
+
+                  for (BlockPos bp : affected) {
+                      BlockState st = level.getBlockState(bp);
+                      if (st.isAir() || st.getBlock() instanceof TntBlock || st.hasBlockEntity()) continue;
+                      if (sampleIds.size() < 24) {
+                          sampleIds.add(Block.getId(st));
+                      }
+                      if (st.isCollisionShapeFullBlock(level, bp) && st.getDestroySpeed(level, bp) >= 0) {
+                          candidates.add(bp);
+                      }
+                  }
+
+                  Collections.shuffle(candidates, new java.util.Random(level.random.nextLong()));
+                  int maxFlying = Math.min(candidates.size(), PhysicsConfig.qualityLevel == 0 ? 12 : (PhysicsConfig.qualityLevel == 2 ? 34 : 22));
+                  List<BlockPos> converted = new ArrayList<>(maxFlying);
+
+                  for (int i = 0; i < maxFlying; i++) {
+                      BlockPos bp = candidates.get(i);
+                      BlockState st = level.getBlockState(bp);
+                      converted.add(bp);
+                      level.setBlock(bp, Blocks.AIR.defaultBlockState(), 3);
+
+                      double dx = (bp.getX() + 0.5) - center.x;
+                      double dy = (bp.getY() + 0.5) - center.y;
+                      double dz = (bp.getZ() + 0.5) - center.z;
+                      double dist = Math.max(0.5, Math.sqrt(dx * dx + dy * dy + dz * dz));
+                      double power = Math.min(1.35, (radius / dist) * 0.42 + 0.25);
+
+                      Vec3 vel = new Vec3(
+                          (dx / dist) * power + (level.random.nextDouble() - 0.5) * 0.22,
+                          Math.max(0.28, (dy / dist) * power + 0.38 + level.random.nextDouble() * 0.28),
+                          (dz / dist) * power + (level.random.nextDouble() - 0.5) * 0.22
+                      );
+                      Vec3 ang = new Vec3(
+                          (level.random.nextDouble() - 0.5) * 0.95,
+                          (level.random.nextDouble() - 0.5) * 0.75,
+                          (level.random.nextDouble() - 0.5) * 0.95
+                      );
+
+                      boolean settleIntoWorld = (i % 2 == 0);
+                      FluidBlockEntity debris = FluidBlockEntity.createExplosionDebris(
+                          level, bp.getX() + 0.5, bp.getY() + 0.5, bp.getZ() + 0.5,
+                          st, vel, ang, settleIntoWorld
+                      );
+                      level.addFreshEntity(debris);
+                  }
+
+                  affected.removeAll(converted);
+
+                  // Blast existing FluidBlockEntities nearby
+                  AABB blastBox = new AABB(center, center).inflate(radius * 2.5);
+                  for (FluidBlockEntity fbe : level.getEntitiesOfClass(FluidBlockEntity.class, blastBox)) {
+                      if (fbe.getMode() == FluidBlockEntity.MODE_PLACEMENT_SETTLE) continue;
+                      Vec3 diff = fbe.position().subtract(center);
+                      double dist = Math.max(0.5, diff.length());
+                      float impulse = (float) Math.min(1.6, (radius / dist) * 0.75);
+                      fbe.body.vx += (float) ((diff.x / dist) * impulse);
+                      fbe.body.vy += (float) ((diff.y / dist) * impulse + 0.35);
+                      fbe.body.vz += (float) ((diff.z / dist) * impulse);
+                      fbe.body.wx += (level.random.nextFloat() - 0.5F) * 0.9F;
+                      fbe.body.wz += (level.random.nextFloat() - 0.5F) * 0.9F;
+                      fbe.wakeUp();
+                  }
+
+                  int[] sampleArray = sampleIds.stream().mapToInt(Integer::intValue).toArray();
+                  ModNetwork.sendExplosion(level, center.x, center.y, center.z, radius, sampleArray);
+              }
+
+              @SubscribeEvent
+              public void onMobDeath(LivingDeathEvent event) {
+                  if (!(event.getEntity().level() instanceof ServerLevel level)) return;
+                  Entity e = event.getEntity();
+                  BlockPos below = e.blockPosition().below();
+                  BlockState floor = level.getBlockState(below);
+                  if (floor.isAir()) floor = Blocks.RED_CONCRETE.defaultBlockState();
+                  ModNetwork.sendBounceParticles(level, e.getX(), e.getY() + e.getBbHeight() *
