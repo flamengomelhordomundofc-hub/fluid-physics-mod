@@ -52,7 +52,7 @@ jobs:
 
           cat << 'EOF' > build.gradle
           plugins {
-              id "net.minecraftforge.gradle" version "[6.0.24,6.2)"
+              id "net.minecraftforge.gradle" version "6.0.24"
           }
 
           version = "2.0.0"
@@ -72,7 +72,7 @@ jobs:
               minecraft "net.minecraftforge:forge:1.20.1-47.2.0"
           }
 
-          jar {
+          tasks.named("jar") {
               finalizedBy "reobfJar"
           }
 
@@ -225,14 +225,20 @@ jobs:
                   IEventBus b = FMLJavaModLoadingContext.get().getModEventBus();
                   ENTITIES.register(b);
                   ITEMS.register(b);
-                  b.addListener((FMLCommonSetupEvent e) -> e.enqueueWork(FPMod::regNet));
-                  b.addListener((BuildCreativeModeTabContentsEvent e) -> {
-                      if (e.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
-                          e.accept(PHYSICAL.get());
-                          e.accept(SUPER_GLUE.get());
-                      }
-                  });
+                  b.addListener(this::commonSetup);
+                  b.addListener(this::addCreative);
                   MinecraftForge.EVENT_BUS.register(new FPTools.Events());
+              }
+
+              private void commonSetup(FMLCommonSetupEvent e) {
+                  e.enqueueWork(FPMod::regNet);
+              }
+
+              private void addCreative(BuildCreativeModeTabContentsEvent e) {
+                  if (e.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
+                      e.accept(PHYSICAL.get());
+                      e.accept(SUPER_GLUE.get());
+                  }
               }
 
               private static void regNet() {
@@ -460,7 +466,7 @@ jobs:
               public double px, py, pz;
               public float vx, vy, vz, wx, wy, wz, mass = 1.2F, rest = 0.30F, fric = 0.52F, buoy = 0.65F, lastImp = 0.0F;
               public final Quaternionf rot = new Quaternionf();
-              public boolean onGround = false;
+              public boolean grounded = false;
               private boolean dropItem = true, settle = true;
               private int age = 0, restTicks = 0, bCd = 0;
               private final List<Part> parts = new ArrayList<>();
@@ -620,12 +626,12 @@ jobs:
                       FPMod.sendBnc(sLvl, px, py - 0.35, pz, mainSt, lastImp, 0);
                   }
                   float spd = (float) Math.sqrt(vx * vx + vy * vy + vz * vz);
-                  if (onGround && spd > 0.14F && (age & 1) == 0) {
+                  if (grounded && spd > 0.14F && (age & 1) == 0) {
                       FPMod.sendBnc(sLvl, px, py - 0.35, pz, mainSt, spd * 0.45F, 0);
                   }
                   interactEntities(sLvl, mainSt, spd);
                   float angSp = (float) Math.sqrt(wx * wx + wy * wy + wz * wz);
-                  if (onGround && spd < 0.055F && angSp < 0.065F) {
+                  if (grounded && spd < 0.055F && angSp < 0.065F) {
                       restTicks++;
                       if (!isPersistent() && settle && restTicks >= 10) rot.slerp(new Quaternionf(), 0.32F).normalize();
                   } else {
@@ -637,7 +643,7 @@ jobs:
 
               private void stepRigid(Level lvl, List<Part> plist) {
                   lastImp = 0.0F;
-                  onGround = false;
+                  grounded = false;
                   float dt = 0.5F;
                   BlockPos.MutableBlockPos mp = new BlockPos.MutableBlockPos(), np = new BlockPos.MutableBlockPos();
                   int maxC = 64;
@@ -731,7 +737,7 @@ jobs:
                               else if (nx < -0.5F) pNX = Math.max(pNX, pen);
                               if (ny > 0.5F) {
                                   pPY = Math.max(pPY, pen);
-                                  onGround = true;
+                                  grounded = true;
                               } else if (ny < -0.5F) {
                                   pNY = Math.max(pNY, pen);
                               }
@@ -781,7 +787,7 @@ jobs:
                               }
                           }
                       }
-                      if (onGround && (vx * vx + vy * vy + vz * vz) < 0.001F && (wx * wx + wy * wy + wz * wz) < 0.002F) {
+                      if (grounded && (vx * vx + vy * vy + vz * vz) < 0.001F && (wx * wx + wy * wy + wz * wz) < 0.002F) {
                           vx *= 0.80F;
                           vz *= 0.80F;
                           wx *= 0.78F;
@@ -855,12 +861,12 @@ jobs:
                               float rv = (float) ((vx - other.vx) * nx + (vy - other.vy) * ny + (vz - other.vz) * nz);
                               if (rv < 0) {
                                   float j = -(1.25F) * rv * 0.5F;
-                                  vx += nx * j;
-                                  vy += ny * j;
-                                  vz += nz * j;
-                                  other.vx -= nx * j;
-                                  other.vy -= ny * j;
-                                  other.vz -= nz * j;
+                                  vx += (float) (nx * j);
+                                  vy += (float) (ny * j);
+                                  vz += (float) (nz * j);
+                                  other.vx -= (float) (nx * j);
+                                  other.vy -= (float) (ny * j);
+                                  other.vz -= (float) (nz * j);
                                   wx += (sLvl.random.nextFloat() - 0.5F) * 0.18F;
                                   wz += (sLvl.random.nextFloat() - 0.5F) * 0.18F;
                                   other.wx -= (sLvl.random.nextFloat() - 0.5F) * 0.18F;
@@ -883,7 +889,7 @@ jobs:
                               float mScale = 1.0F / Math.max(0.8F, (float) Math.sqrt(mass));
                               float push = (float) (Math.min(0.42, es * 1.15 + 0.055) * mScale);
                               vx += (float) ((dx / d) * push + ev.x * 0.72 * mScale);
-                              vy += (float) Math.min(0.11, 0.03 + es * 0.18) * mScale;
+                              vy += (float) (Math.min(0.11, 0.03 + es * 0.18) * mScale);
                               vz += (float) ((dz / d) * push + ev.z * 0.72 * mScale);
                               wx += (float) (-(dz / d) * push * 1.15);
                               wy += (float) ((ev.x * dz - ev.z * dx) * 0.35 * mScale);
@@ -946,7 +952,7 @@ jobs:
 
               public void wake() {
                   restTicks = 0;
-                  onGround = false;
+                  grounded = false;
               }
 
               @Override
@@ -1231,13 +1237,13 @@ jobs:
                       BlockPos p = e.getPos();
                       BlockState s = e.getPlacedBlock();
                       FPMod.sendPlc(l, p, s);
-                      double cx = p.getX() + 0.5, cy = p.getY() + 0.5, cz = p.getZ() + 0.5;
+                      double cx = p.getX() + 0.5, cz = p.getZ() + 0.5;
                       for (FPBlockEntity f : l.getEntitiesOfClass(FPBlockEntity.class, new AABB(p).inflate(3.5))) {
                           double dx = f.px - cx, dz = f.pz - cz, d = Math.max(0.25, Math.sqrt(dx * dx + dz * dz));
                           float k = (float) Math.max(0.0, (1.0 - d / 3.8) * 0.22);
-                          f.vx += (dx / d) * k;
+                          f.vx += (float) ((dx / d) * k);
                           f.vy += k * 0.75F + 0.05F;
-                          f.vz += (dz / d) * k;
+                          f.vz += (float) ((dz / d) * k);
                           f.wx += (l.random.nextFloat() - 0.5F) * 0.25F;
                           f.wz += (l.random.nextFloat() - 0.5F) * 0.25F;
                           f.wake();
@@ -1302,9 +1308,9 @@ jobs:
                           Vec3 df = f.position().subtract(c);
                           double d = Math.max(0.5, df.length());
                           float imp = (float) Math.min(1.6, (rad / d) * 0.75);
-                          f.vx += (df.x / d) * imp;
-                          f.vy += (df.y / d) * imp + 0.35F;
-                          f.vz += (df.z / d) * imp;
+                          f.vx += (float) ((df.x / d) * imp);
+                          f.vy += (float) ((df.y / d) * imp + 0.35F);
+                          f.vz += (float) ((df.z / d) * imp);
                           f.wx += (l.random.nextFloat() - 0.5F) * 0.9F;
                           f.wz += (l.random.nextFloat() - 0.5F) * 0.9F;
                           f.wake();
@@ -1365,7 +1371,11 @@ jobs:
                                   .then(Commands.literal("medium").executes(x -> q(x.getSource(), 1)))
                                   .then(Commands.literal("high").executes(x -> q(x.getSource(), 2))))
                               .then(Commands.literal("clear").executes(x -> {
-                                  for (FPBlockEntity f : x.getSource().getLevel().getEntities(FPMod.FLUID_BLOCK.get(), z -> true)) f.discard();
+                                  List<FPBlockEntity> rem = new ArrayList<>();
+                                  for (Entity ent : x.getSource().getLevel().getAllEntities()) {
+                                      if (ent instanceof FPBlockEntity f) rem.add(f);
+                                  }
+                                  for (FPBlockEntity f : rem) f.discard();
                                   FPMod.sendSync(FPMod.fullGrav, FPMod.qual, true);
                                   x.getSource().sendSuccess(() -> Component.literal("Blocos fisicos e particulas limpos!"), false);
                                   return 1;
@@ -1522,9 +1532,9 @@ jobs:
                       if (d2 > 0.01 && d2 < 12.25) {
                           double dist = Math.sqrt(d2);
                           float k = (float) ((1.0 - dist / 3.5) * 0.22);
-                          d.vx += (dx / dist) * k;
+                          d.vx += (float) ((dx / dist) * k);
                           d.vy += k + 0.06F;
-                          d.vz += (dz / dist) * k;
+                          d.vz += (float) ((dz / dist) * k);
                       }
                   }
                   for (P3D p : PTS) {
@@ -1532,9 +1542,9 @@ jobs:
                       if (d2 > 0.01 && d2 < 12.25) {
                           double dist = Math.sqrt(d2);
                           float k = (float) ((1.0 - dist / 3.5) * 0.25);
-                          p.vx += (dx / dist) * k;
+                          p.vx += (float) ((dx / dist) * k);
                           p.vy += k + 0.07F;
-                          p.vz += (dz / dist) * k;
+                          p.vz += (float) ((dz / dist) * k);
                       }
                   }
               }
@@ -1556,18 +1566,18 @@ jobs:
                       double dx = d.x - m.x(), dy = d.y - m.y(), dz = d.z - m.z(), dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
                       if (dist > 0.05 && dist < rad) {
                           float f = (float) ((1.0 - dist / rad) * 1.15);
-                          d.vx += (dx / dist) * f;
-                          d.vy += (dy / dist) * f + 0.28F * f;
-                          d.vz += (dz / dist) * f;
+                          d.vx += (float) ((dx / dist) * f);
+                          d.vy += (float) ((dy / dist) * f + 0.28F * f);
+                          d.vz += (float) ((dz / dist) * f);
                       }
                   }
                   for (P3D p : PTS) {
                       double dx = p.x - m.x(), dy = p.y - m.y(), dz = p.z - m.z(), dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
                       if (dist > 0.05 && dist < rad) {
                           float f = (float) ((1.0 - dist / rad) * 1.3);
-                          p.vx += (dx / dist) * f;
-                          p.vy += (dy / dist) * f + 0.32F * f;
-                          p.vz += (dz / dist) * f;
+                          p.vx += (float) ((dx / dist) * f);
+                          p.vy += (float) ((dy / dist) * f + 0.32F * f);
+                          p.vz += (float) ((dz / dist) * f);
                       }
                   }
                   int[] ids = m.ids();
@@ -1775,9 +1785,9 @@ jobs:
                               double dist = Math.sqrt(d2);
                               if ((dx * look.x + dy * look.y + dz * look.z) / dist > 0.62) {
                                   float f = (float) ((1.0 - dist / 3.5) * 0.55 + 0.16);
-                                  d.vx += look.x * f;
-                                  d.vy += look.y * f + 0.15F;
-                                  d.vz += look.z * f;
+                                  d.vx += (float) (look.x * f);
+                                  d.vy += (float) (look.y * f + 0.15F);
+                                  d.vz += (float) (look.z * f);
                                   d.wx += (RNG.nextFloat() - 0.5F) * 0.9F;
                                   d.wz += (RNG.nextFloat() - 0.5F) * 0.9F;
                               }
@@ -1787,11 +1797,11 @@ jobs:
                           if (ent.getBoundingBox().inflate(0.2).contains(d.x, d.y, d.z)) {
                               double evx = ent.getX() - ent.xo, evz = ent.getZ() - ent.zo, dx = d.x - ent.getX(), dz = d.z - ent.getZ(), dl = Math.max(0.05, Math.sqrt(dx * dx + dz * dz)), sp = Math.sqrt(evx * evx + evz * evz);
                               float k = (float) Math.min(0.45, sp * 1.45 + 0.08);
-                              d.vx += (dx / dl) * k + evx * 0.85;
+                              d.vx += (float) ((dx / dl) * k + evx * 0.85);
                               d.vy += 0.07F + (float) Math.min(0.12, sp * 0.4);
-                              d.vz += (dz / dl) * k + evz * 0.85;
-                              d.wx += -(dz / dl) * k * 2F;
-                              d.wz += (dx / dl) * k * 2F;
+                              d.vz += (float) ((dz / dl) * k + evz * 0.85);
+                              d.wx += (float) (-(dz / dl) * k * 2F);
+                              d.wz += (float) ((dx / dl) * k * 2F);
                           }
                       }
                   }
@@ -1843,9 +1853,9 @@ jobs:
                           if (d2 > 0.005 && d2 < 9.0) {
                               double dist = Math.sqrt(d2);
                               float f = (float) ((1.0 - dist / 3.0) * 0.34);
-                              p.vx += (dx / dist) * f;
+                              p.vx += (float) ((dx / dist) * f);
                               p.vy += f + 0.12F;
-                              p.vz += (dz / dist) * f;
+                              p.vz += (float) ((dz / dist) * f);
                           }
                       }
                       if (swung) {
@@ -1854,9 +1864,9 @@ jobs:
                               double dist = Math.sqrt(d2);
                               if ((dx * look.x + dy * look.y + dz * look.z) / dist > 0.58) {
                                   float f = (float) ((1.0 - dist / 4.0) * 0.65 + 0.16);
-                                  p.vx += look.x * f + (RNG.nextFloat() - 0.5F) * 0.18F;
-                                  p.vy += look.y * f + 0.12F;
-                                  p.vz += look.z * f + (RNG.nextFloat() - 0.5F) * 0.18F;
+                                  p.vx += (float) (look.x * f) + (RNG.nextFloat() - 0.5F) * 0.18F;
+                                  p.vy += (float) (look.y * f) + 0.12F;
+                                  p.vz += (float) (look.z * f) + (RNG.nextFloat() - 0.5F) * 0.18F;
                                   p.wrx += (RNG.nextFloat() - 0.5F) * 1.4F;
                                   p.wry += (RNG.nextFloat() - 0.5F) * 1.4F;
                               }
@@ -1866,9 +1876,9 @@ jobs:
                           if (ent.getBoundingBox().inflate(0.30).contains(p.x, p.y, p.z)) {
                               double evx = ent.getX() - ent.xo, evy = ent.getY() - ent.yo, evz = ent.getZ() - ent.zo, dx = p.x - ent.getX(), dz = p.z - ent.getZ(), dl = Math.max(0.04, Math.sqrt(dx * dx + dz * dz)), sp = Math.sqrt(evx * evx + evz * evz);
                               float push = (float) Math.min(0.46, sp * 1.6 + 0.07);
-                              p.vx += (dx / dl) * push + evx * 1.25 - (dz / dl) * sp * 0.55;
+                              p.vx += (float) ((dx / dl) * push + evx * 1.25 - (dz / dl) * sp * 0.55);
                               p.vy += 0.055F + (float) Math.min(0.16, sp * 0.6) + (float) Math.max(0, evy * 0.5);
-                              p.vz += (dz / dl) * push + evz * 1.25 + (dx / dl) * sp * 0.55;
+                              p.vz += (float) ((dz / dl) * push + evz * 1.25 + (dx / dl) * sp * 0.55);
                               p.wrx += (RNG.nextFloat() - 0.5F) * 1.0F;
                               p.wry += (RNG.nextFloat() - 0.5F) * 1.0F;
                           }
@@ -2128,7 +2138,7 @@ jobs:
           EOF
 
       - name: Build JAR
-        run: gradle build --no-daemon --stacktrace && ls -lh build/libs/
+        run: gradle build --no-daemon --console=plain && ls -lh build/libs/
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -2138,6 +2148,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publish Release
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
