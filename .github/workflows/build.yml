@@ -1,4 +1,4 @@
-name: FluidPhysics V3
+name: FluidPhysics V4
 
 on:
   push:
@@ -25,7 +25,7 @@ jobs:
         with:
           gradle-version: '8.8'
 
-      - name: Generate V3 Mod and Custom Textures
+      - name: Generate V4 Mod
         run: |
           mkdir -p src/main/java/com/fp
           mkdir -p src/main/resources/META-INF
@@ -130,7 +130,7 @@ jobs:
               id "net.minecraftforge.gradle" version "6.0.24"
           }
 
-          version = "3.0.0"
+          version = "4.0.0"
           group = "com.fp"
 
           base {
@@ -159,7 +159,7 @@ jobs:
           cat << 'EOF' > src/main/resources/pack.mcmeta
           {
             "pack": {
-              "description": "Fluid Physics V3",
+              "description": "Fluid Physics V4",
               "pack_format": 15
             }
           }
@@ -172,9 +172,9 @@ jobs:
 
           [[mods]]
           modId="fluidphysics"
-          version="3.0.0"
-          displayName="Fluid Physics V3"
-          description="Solid Collidable 3D Physics Blocks, Physical Wand, Super Glue, Custom Textures and Creative Tab"
+          version="4.0.0"
+          displayName="Fluid Physics V4"
+          description="Climbable Solid 3D Physics Blocks, Controlled Weighty Push, Satisfying Block Placement, Custom Item Textures and Creative Tab"
 
           [[dependencies.fluidphysics]]
               modId="forge"
@@ -308,9 +308,9 @@ jobs:
 
               public static final SimpleChannel CH = NetworkRegistry.newSimpleChannel(
                   new ResourceLocation(MODID, "net"),
-                  () -> "3",
-                  "3"::equals,
-                  "3"::equals
+                  () -> "4",
+                  "4"::equals,
+                  "4"::equals
               );
 
               public FPMod() {
@@ -348,7 +348,7 @@ jobs:
               }
 
               public static void sendPlc(ServerLevel l, BlockPos p, BlockState s) {
-                  CH.send(PacketDistributor.NEAR.with(() -> new PacketDistributor.TargetPoint(p.getX() + 0.5, p.getY() + 0.5, p.getZ() + 0.5, 42, l.dimension())), new Plc(p, Block.getId(s)));
+                  CH.send(PacketDistributor.NEAR.with(() -> new PacketDistributor.TargetPoint(p.getX() + 0.5, p.getY() + 0.5, p.getZ() + 0.5, 40, l.dimension())), new Plc(p, Block.getId(s)));
               }
 
               public static void sendBnc(ServerLevel l, double x, double y, double z, BlockState s, float pow, int style) {
@@ -381,18 +381,18 @@ jobs:
 
               public static float rest(BlockState s) {
                   SoundType t = s.getSoundType();
-                  if (t == SoundType.SLIME_BLOCK || s.is(Blocks.SLIME_BLOCK)) return 0.85F;
+                  if (t == SoundType.SLIME_BLOCK || s.is(Blocks.SLIME_BLOCK)) return 0.82F;
                   if (t == SoundType.HONEY_BLOCK) return 0.05F;
-                  if (t == SoundType.SAND || t == SoundType.GRAVEL || t == SoundType.SNOW) return 0.16F;
-                  if (t == SoundType.WOOD) return 0.36F;
-                  if (t == SoundType.METAL || t == SoundType.ANVIL) return 0.38F;
-                  return 0.30F;
+                  if (t == SoundType.SAND || t == SoundType.GRAVEL || t == SoundType.SNOW) return 0.12F;
+                  if (t == SoundType.WOOD) return 0.28F;
+                  if (t == SoundType.METAL || t == SoundType.ANVIL) return 0.30F;
+                  return 0.22F;
               }
 
               public static float fric(BlockState s) {
-                  if (s.is(BlockTags.ICE)) return 0.04F;
-                  if (s.getSoundType() == SoundType.HONEY_BLOCK) return 0.95F;
-                  return 0.52F;
+                  if (s.is(BlockTags.ICE)) return 0.05F;
+                  if (s.getSoundType() == SoundType.HONEY_BLOCK) return 0.96F;
+                  return 0.72F;
               }
 
               public static float buoy(BlockState s) {
@@ -404,11 +404,11 @@ jobs:
 
               public static float mass(BlockState s) {
                   SoundType t = s.getSoundType();
-                  if (t == SoundType.ANVIL || s.is(Blocks.OBSIDIAN)) return 3.0F;
-                  if (t == SoundType.METAL) return 2.2F;
-                  if (t == SoundType.STONE) return 1.6F;
-                  if (t == SoundType.WOOD) return 0.9F;
-                  return 1.15F;
+                  if (t == SoundType.ANVIL || s.is(Blocks.OBSIDIAN)) return 3.2F;
+                  if (t == SoundType.METAL) return 2.4F;
+                  if (t == SoundType.STONE) return 1.8F;
+                  if (t == SoundType.WOOD) return 1.0F;
+                  return 1.25F;
               }
 
               public static boolean tinted(BlockState s) {
@@ -557,7 +557,7 @@ jobs:
               private static final EntityDataAccessor<Float> D_RAD = SynchedEntityData.defineId(FPBlockEntity.class, EntityDataSerializers.FLOAT);
 
               public double px, py, pz;
-              public float vx, vy, vz, wx, wy, wz, mass = 1.2F, rest = 0.30F, fric = 0.52F, buoy = 0.65F, lastImp = 0.0F;
+              public float vx, vy, vz, wx, wy, wz, mass = 1.25F, rest = 0.22F, fric = 0.72F, buoy = 0.65F, lastImp = 0.0F;
               public final Quaternionf rot = new Quaternionf();
               public boolean grounded = false;
               private boolean dropItem = true, settle = true;
@@ -659,8 +659,8 @@ jobs:
                       for (Part pt : pl) {
                           v.set(pt.ox, pt.oy, pt.oz);
                           q.transform(v);
-                          double bx0 = cx + v.x - 0.48, by0 = cy + v.y - 0.48, bz0 = cz + v.z - 0.48;
-                          double bx1 = cx + v.x + 0.48, by1 = cy + v.y + 0.48, bz1 = cz + v.z + 0.48;
+                          double bx0 = cx + v.x - 0.49, by0 = cy + v.y - 0.49, bz0 = cz + v.z - 0.49;
+                          double bx1 = cx + v.x + 0.49, by1 = cy + v.y + 0.49, bz1 = cz + v.z + 0.49;
                           if (bx0 < x0) x0 = bx0;
                           if (by0 < y0) y0 = by0;
                           if (bz0 < z0) z0 = bz0;
@@ -700,7 +700,7 @@ jobs:
                   lX = x;
                   lY = y;
                   lZ = z;
-                  lSteps = Math.max(1, Math.min(st, 3));
+                  lSteps = Math.max(1, Math.min(st, 2));
               }
 
               @Override
@@ -733,18 +733,18 @@ jobs:
                   List<Part> plist = getBlockParts();
                   BlockState mainSt = plist.get(0).state;
                   stepRigid(sLvl, plist);
-                  if (lastImp > 0.20F && bCd == 0) {
-                      bCd = 3;
-                      sLvl.playSound(null, px, py, pz, mainSt.getSoundType().getFallSound(), SoundSource.BLOCKS, Mth.clamp(lastImp * 1.1F, 0.25F, 1.1F), 0.82F + sLvl.random.nextFloat() * 0.28F);
-                      FPMod.sendBnc(sLvl, px, py - 0.35, pz, mainSt, lastImp, 0);
+                  if (lastImp > 0.22F && bCd == 0) {
+                      bCd = 4;
+                      sLvl.playSound(null, px, py, pz, mainSt.getSoundType().getFallSound(), SoundSource.BLOCKS, Mth.clamp(lastImp * 1.0F, 0.25F, 1.0F), 0.84F + sLvl.random.nextFloat() * 0.24F);
+                      FPMod.sendBnc(sLvl, px, py - 0.42, pz, mainSt, lastImp * 0.8F, 0);
                   }
                   float spd = (float) Math.sqrt(vx * vx + vy * vy + vz * vz);
-                  if (grounded && spd > 0.14F && (age & 1) == 0) {
-                      FPMod.sendBnc(sLvl, px, py - 0.35, pz, mainSt, spd * 0.45F, 0);
+                  if (grounded && spd > 0.16F && (age & 1) == 0) {
+                      FPMod.sendBnc(sLvl, px, py - 0.44, pz, mainSt, spd * 0.35F, 0);
                   }
-                  interactEntities(sLvl, mainSt, spd);
+                  interactEntities(sLvl, mainSt, spd, plist.size());
                   float angSp = (float) Math.sqrt(wx * wx + wy * wy + wz * wz);
-                  if (grounded && spd < 0.055F && angSp < 0.065F) {
+                  if (grounded && spd < 0.05F && angSp < 0.06F) {
                       restTicks++;
                       if (!isPersistent() && settle && restTicks >= 10) rot.slerp(new Quaternionf(), 0.32F).normalize();
                   } else {
@@ -766,7 +766,7 @@ jobs:
                   float invM = 1.0F / Math.max(0.25F, mass);
                   float inertia = 0.0F;
                   for (Part pt : plist) inertia += (pt.ox * pt.ox + pt.oy * pt.oy + pt.oz * pt.oz + 0.5F) * FPMod.mass(pt.state);
-                  float invI = 1.45F / Math.max(0.25F, inertia);
+                  float invI = 1.4F / Math.max(0.25F, inertia);
                   for (int s = 0; s < 2; s++) {
                       mp.set(Mth.floor(px), Mth.floor(py), Mth.floor(pz));
                       FluidState fl = lvl.getFluidState(mp);
@@ -775,9 +775,9 @@ jobs:
                           float sub = Mth.clamp((float) (sy - (py - 0.5)), 0.0F, 1.0F);
                           vy += (-0.04F + 0.04F * buoy * sub) * dt;
                           Vec3 flow = fl.getFlow(lvl, mp);
-                          vx += (float) flow.x * 0.02F * dt;
-                          vz += (float) flow.z * 0.02F * dt;
-                          float wv = (float) Math.sin(px * 1.6 + pz * 1.4 + lvl.getGameTime() * 0.12) * 0.01F;
+                          vx += (float) flow.x * 0.018F * dt;
+                          vz += (float) flow.z * 0.018F * dt;
+                          float wv = (float) Math.sin(px * 1.6 + pz * 1.4 + lvl.getGameTime() * 0.12) * 0.008F;
                           wx += wv * dt;
                           wz -= wv * 0.7F * dt;
                           float ld = (float) Math.pow(0.84, dt), ad = (float) Math.pow(0.80, dt);
@@ -789,7 +789,7 @@ jobs:
                           wz *= ad;
                       } else {
                           vy -= 0.04F * dt;
-                          float ld = (float) Math.pow(0.994, dt), ad = (float) Math.pow(0.988, dt);
+                          float ld = (float) Math.pow(0.992, dt), ad = (float) Math.pow(0.982, dt);
                           vx *= ld;
                           vy *= ld;
                           vz *= ld;
@@ -857,9 +857,9 @@ jobs:
                               if (nz > 0.5F) pPZ = Math.max(pPZ, pen);
                               else if (nz < -0.5F) pNZ = Math.max(pNZ, pen);
                           }
-                          px += (pPX - pNX) * 0.84;
-                          py += (pPY - pNY) * 0.88;
-                          pz += (pPZ - pNZ) * 0.84;
+                          px += (pPX - pNX) * 0.85;
+                          py += (pPY - pNY) * 0.90;
+                          pz += (pPZ - pNZ) * 0.85;
                           float relax = nc > 4 ? 0.55F : 0.82F;
                           for (int it = 0; it < 2; it++) {
                               for (int c = 0; c < nc; c++) {
@@ -868,7 +868,7 @@ jobs:
                                   float vn = vcx * nx + vcy * ny + vcz * nz;
                                   if (vn >= 0F) continue;
                                   if (-vn > lastImp) lastImp = -vn;
-                                  float e = (-vn > 0.08F) ? rest : 0F;
+                                  float e = (-vn > 0.09F) ? rest : 0F;
                                   float rcnX = ry * nz - rz * ny, rcnY = rz * nx - rx * nz, rcnZ = rx * ny - ry * nx;
                                   float j = (-(1F + e) * vn / (invM + (rcnX * rcnX + rcnY * rcnY + rcnZ * rcnZ) * invI)) * relax;
                                   float jx = nx * j, jy = ny * j, jz = nz * j;
@@ -900,12 +900,20 @@ jobs:
                               }
                           }
                       }
-                      if (grounded && (vx * vx + vy * vy + vz * vz) < 0.001F && (wx * wx + wy * wy + wz * wz) < 0.002F) {
-                          vx *= 0.80F;
-                          vz *= 0.80F;
-                          wx *= 0.78F;
-                          wy *= 0.78F;
-                          wz *= 0.78F;
+                      if (grounded) {
+                          float gd = fric < 0.15F ? 0.992F : 0.91F;
+                          vx *= gd;
+                          vz *= gd;
+                          wx *= 0.92F;
+                          wy *= 0.90F;
+                          wz *= 0.92F;
+                          if ((vx * vx + vy * vy + vz * vz) < 0.0012F && (wx * wx + wy * wy + wz * wz) < 0.0025F) {
+                              vx *= 0.72F;
+                              vz *= 0.72F;
+                              wx *= 0.70F;
+                              wy *= 0.70F;
+                              wz *= 0.70F;
+                          }
                       }
                       if (!Float.isFinite(vx)) vx = 0;
                       if (!Float.isFinite(vy)) vy = 0;
@@ -913,12 +921,12 @@ jobs:
                       if (!Float.isFinite(wx)) wx = 0;
                       if (!Float.isFinite(wy)) wy = 0;
                       if (!Float.isFinite(wz)) wz = 0;
-                      vx = Mth.clamp(vx, -2.5F, 2.5F);
-                      vy = Mth.clamp(vy, -2.5F, 2.5F);
-                      vz = Mth.clamp(vz, -2.5F, 2.5F);
-                      wx = Mth.clamp(wx, -1.2F, 1.2F);
-                      wy = Mth.clamp(wy, -1.2F, 1.2F);
-                      wz = Mth.clamp(wz, -1.2F, 1.2F);
+                      vx = Mth.clamp(vx, -2.2F, 2.2F);
+                      vy = Mth.clamp(vy, -2.2F, 2.2F);
+                      vz = Mth.clamp(vz, -2.2F, 2.2F);
+                      wx = Mth.clamp(wx, -1.0F, 1.0F);
+                      wy = Mth.clamp(wy, -1.0F, 1.0F);
+                      wz = Mth.clamp(wz, -1.0F, 1.0F);
                       if (!Float.isFinite(rot.w)) rot.identity();
                   }
               }
@@ -955,10 +963,10 @@ jobs:
                   return !s.isAir() && s.getCollisionShape(l, p) == Shapes.block();
               }
 
-              private void interactEntities(ServerLevel sLvl, BlockState st, float spd) {
+              private void interactEntities(ServerLevel sLvl, BlockState st, float spd, int partCount) {
                   AABB box = getBoundingBox();
                   float r = getRad();
-                  List<Entity> list = sLvl.getEntities(this, box.inflate(0.22));
+                  List<Entity> list = sLvl.getEntities(this, box.inflate(0.10));
                   for (Entity ent : list) {
                       if (ent instanceof FPBlockEntity other && other.getId() > getId()) {
                           double dx = px - other.px, dy = py - other.py, dz = pz - other.pz;
@@ -974,48 +982,54 @@ jobs:
                               other.pz -= nz * ov;
                               float rv = (float) ((vx - other.vx) * nx + (vy - other.vy) * ny + (vz - other.vz) * nz);
                               if (rv < 0) {
-                                  float j = -(1.25F) * rv * 0.5F;
+                                  float j = -(1.15F) * rv * 0.5F;
                                   vx += (float) (nx * j);
                                   vy += (float) (ny * j);
                                   vz += (float) (nz * j);
                                   other.vx -= (float) (nx * j);
                                   other.vy -= (float) (ny * j);
                                   other.vz -= (float) (nz * j);
-                                  wx += (sLvl.random.nextFloat() - 0.5F) * 0.18F;
-                                  wz += (sLvl.random.nextFloat() - 0.5F) * 0.18F;
-                                  other.wx -= (sLvl.random.nextFloat() - 0.5F) * 0.18F;
+                                  wx += (sLvl.random.nextFloat() - 0.5F) * 0.10F;
+                                  wz += (sLvl.random.nextFloat() - 0.5F) * 0.10F;
                               }
                           }
                       } else if (ent instanceof LivingEntity && ent.isAlive()) {
                           Vec3 ev = (ent instanceof Player pl) ? FPTools.getPlayerVel(pl) : ent.getDeltaMovement();
-                          double dx = px - ent.getX(), dy = py - (ent.getY() + ent.getBbHeight() * 0.5), dz = pz - ent.getZ();
-                          double d2 = dx * dx + dy * dy + dz * dz;
-                          if (d2 < 0.001) continue;
+                          double dx = px - ent.getX(), dz = pz - ent.getZ();
+                          double d2 = dx * dx + dz * dz;
+                          if (d2 < 0.0004) continue;
                           double d = Math.sqrt(d2);
-                          if (ent.getY() >= box.maxY - 0.28) {
-                              float mScale = 1.0F / Math.max(1.0F, mass);
-                              wx += (float) (-(ent.getZ() - pz) * 0.018 * mScale);
-                              wz += (float) ((ent.getX() - px) * 0.018 * mScale);
-                          } else if (spd > 0.48F && vy < -0.25F && mass >= 1.5F && age > 5) {
-                              float dmg = Mth.clamp(spd * Math.min(4F, mass) * 3.5F, 2F, 16F);
-                              ent.hurt(st.getSoundType() == SoundType.ANVIL ? damageSources().anvil(this) : damageSources().fallingBlock(this), dmg);
-                              vy = Math.abs(vy) * 0.35F + 0.12F;
-                              wx += (sLvl.random.nextFloat() - 0.5F) * 0.5F;
-                              wz += (sLvl.random.nextFloat() - 0.5F) * 0.5F;
-                          } else {
-                              double es = ev.horizontalDistance();
-                              double dot = (ev.x * dx + ev.z * dz);
-                              if (es > 0.015 && dot > -0.01) {
-                                  float mScale = 1.0F / Math.max(0.85F, (float) Math.sqrt(mass));
-                                  float push = (float) (Math.min(0.36, es * 0.95 + 0.03) * mScale);
-                                  vx += (float) ((dx / d) * push + ev.x * 0.65 * mScale);
-                                  vy += (float) (Math.min(0.08, 0.015 + es * 0.12) * mScale);
-                                  vz += (float) ((dz / d) * push + ev.z * 0.65 * mScale);
-                                  wx += (float) (-(dz / d) * push * 0.95);
-                                  wy += (float) ((ev.x * dz - ev.z * dx) * 0.25 * mScale);
-                                  wz += (float) ((dx / d) * push * 0.95);
-                                  restTicks = 0;
+                          if (ent.getY() >= box.maxY - 0.42) {
+                              vx *= 0.88F;
+                              vz *= 0.88F;
+                              wx *= 0.82F;
+                              wz *= 0.82F;
+                              if (partCount > 1) {
+                                  float mS = 1.0F / Math.max(1.5F, mass);
+                                  wx += (float) (-(ent.getZ() - pz) * 0.006 * mS);
+                                  wz += (float) ((ent.getX() - px) * 0.006 * mS);
                               }
+                              continue;
+                          }
+                          if (!ent.onGround() && ent.getY() > box.minY + 0.12) continue;
+                          if (spd > 0.48F && vy < -0.26F && mass >= 1.5F && age > 5) {
+                              float dmg = Mth.clamp(spd * Math.min(4F, mass) * 3.2F, 2F, 14F);
+                              ent.hurt(st.getSoundType() == SoundType.ANVIL ? damageSources().anvil(this) : damageSources().fallingBlock(this), dmg);
+                              vy = Math.abs(vy) * 0.3F + 0.08F;
+                              continue;
+                          }
+                          double es = ev.horizontalDistance();
+                          double dot = ev.x * dx + ev.z * dz;
+                          if (es > 0.015 && dot > 0.002 && box.inflate(0.07).intersects(ent.getBoundingBox())) {
+                              float mS = 1.0F / Math.max(0.95F, (float) Math.sqrt(mass));
+                              float maxP = (float) (Math.min(0.095, es * 0.42) * mS);
+                              float tvx = (float) ((dx / d) * maxP + ev.x * 0.55 * mS);
+                              float tvz = (float) ((dz / d) * maxP + ev.z * 0.55 * mS);
+                              vx = Mth.lerp(0.45F, vx, tvx);
+                              vz = Mth.lerp(0.45F, vz, tvz);
+                              wx += (float) (-(dz / d) * maxP * 0.55F);
+                              wz += (float) ((dx / d) * maxP * 0.55F);
+                              restTicks = 0;
                           }
                       }
                   }
@@ -1039,24 +1053,24 @@ jobs:
                       if (pl.isShiftKeyDown()) {
                           for (Part pt : plist) {
                               BlockPos bp = BlockPos.containing(px + pt.ox, py + pt.oy, pz + pt.oz);
-                              FPMod.sendBrk(sLvl, bp, pt.state, 0, 0.12F, 0);
+                              FPMod.sendBrk(sLvl, bp, pt.state, 0, 0.10F, 0);
                               Block.popResource(sLvl, bp, new ItemStack(pt.state.getBlock()));
                           }
                           discard();
                           return true;
                       }
                       Vec3 lk = pl.getLookAngle();
-                      float mScale = 1.0F / Math.max(0.8F, (float) Math.sqrt(mass));
-                      vx += (float) (lk.x * 0.56 * mScale);
-                      vy += (float) (Math.max(0.18, lk.y * 0.45 + 0.16) * mScale);
-                      vz += (float) (lk.z * 0.56 * mScale);
-                      wx += (float) (-lk.z * 0.55 * mScale + (sLvl.random.nextFloat() - 0.5F) * 0.25F);
-                      wy += (sLvl.random.nextFloat() - 0.5F) * 0.35F;
-                      wz += (float) (lk.x * 0.55 * mScale + (sLvl.random.nextFloat() - 0.5F) * 0.25F);
+                      float mS = 1.0F / Math.max(0.95F, (float) Math.sqrt(mass));
+                      vx += (float) (lk.x * 0.20 * mS);
+                      vy += (float) (Mth.clamp(lk.y * 0.12 + 0.06, 0.03, 0.11) * mS);
+                      vz += (float) (lk.z * 0.20 * mS);
+                      wx += (float) (-lk.z * 0.24 * mS + (sLvl.random.nextFloat() - 0.5F) * 0.12F);
+                      wy += (sLvl.random.nextFloat() - 0.5F) * 0.18F;
+                      wz += (float) (lk.x * 0.24 * mS + (sLvl.random.nextFloat() - 0.5F) * 0.12F);
                       restTicks = 0;
                       BlockState mainSt = plist.get(0).state;
-                      sLvl.playSound(null, px, py, pz, mainSt.getSoundType().getHitSound(), SoundSource.BLOCKS, 0.9F, 0.95F);
-                      FPMod.sendBnc(sLvl, px, py, pz, mainSt, 0.65F, 1);
+                      sLvl.playSound(null, px, py, pz, mainSt.getSoundType().getHitSound(), SoundSource.BLOCKS, 0.85F, 0.95F);
+                      FPMod.sendBnc(sLvl, px, py, pz, mainSt, 0.42F, 1);
                       return true;
                   }
                   return false;
@@ -1213,22 +1227,23 @@ jobs:
                       if (!FPMod.safe(st, s, pos)) return InteractionResult.FAIL;
                       s.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
                       Direction f = ctx.getClickedFace().getOpposite();
-                      Vec3 vel = new Vec3(
-                          f.getStepX() * 0.06 + (s.random.nextDouble() - 0.5) * 0.08,
-                          -0.02 + (s.random.nextDouble() * 0.05),
-                          f.getStepZ() * 0.06 + (s.random.nextDouble() - 0.5) * 0.08
-                      );
-                      Vec3 ang = new Vec3(
-                          (s.random.nextDouble() - 0.5) * 0.42,
-                          (s.random.nextDouble() - 0.5) * 0.30,
-                          (s.random.nextDouble() - 0.5) * 0.42
-                      );
+                      boolean inAir = s.getBlockState(pos.below()).getCollisionShape(s, pos.below()).isEmpty();
+                      Vec3 vel = inAir ? new Vec3(
+                          f.getStepX() * 0.04 + (s.random.nextDouble() - 0.5) * 0.06,
+                          -0.02,
+                          f.getStepZ() * 0.04 + (s.random.nextDouble() - 0.5) * 0.06
+                      ) : Vec3.ZERO;
+                      Vec3 ang = inAir ? new Vec3(
+                          (s.random.nextDouble() - 0.5) * 0.36,
+                          (s.random.nextDouble() - 0.5) * 0.24,
+                          (s.random.nextDouble() - 0.5) * 0.36
+                      ) : Vec3.ZERO;
                       List<FPBlockEntity.Part> one = List.of(new FPBlockEntity.Part(0, 0, 0, st));
                       s.addFreshEntity(FPBlockEntity.spawn(s, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, one, vel, ang, true, true, false));
-                      s.playSound(null, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 1.15F);
-                      FPMod.sendBnc(s, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, st, 0.85F, 1);
+                      s.playSound(null, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 0.9F, 1.15F);
+                      FPMod.sendBnc(s, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, st, 0.65F, 1);
                       if (ctx.getPlayer() != null) {
-                          ctx.getPlayer().displayClientMessage(Component.literal("Physical: Bloco solido fisico ativado! (Empurre, suba em cima, bata ou Agache+Bata)"), true);
+                          ctx.getPlayer().displayClientMessage(Component.literal("Physical: Bloco fisico ativado! Suba em cima, empurre ou bata (Agache+Bata quebra)"), true);
                       }
                       return InteractionResult.CONSUME;
                   }
@@ -1267,7 +1282,7 @@ jobs:
                       }
                       if (!removed) {
                           if (list.size() >= 48) {
-                              pl.displayClientMessage(Component.literal("Super Glue: Limite maximo de 48 blocos atingido!"), true);
+                              pl.displayClientMessage(Component.literal("Super Glue: Limite de 48 blocos atingido!"), true);
                               return InteractionResult.FAIL;
                           }
                           list.add(target);
@@ -1275,9 +1290,9 @@ jobs:
                       long[] next = new long[list.size()];
                       for (int i = 0; i < list.size(); i++) next[i] = list.get(i);
                       tag.putLongArray("Glued", next);
-                      s.playSound(null, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, removed ? SoundEvents.SLIME_BLOCK_STEP : SoundEvents.SLIME_BLOCK_PLACE, SoundSource.PLAYERS, 0.9F, removed ? 0.7F : 1.15F);
-                      FPMod.sendBnc(s, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, st, 0.55F, 2);
-                      pl.displayClientMessage(Component.literal("Super Glue: " + next.length + " bloco(s) colado(s) | Agache + Clique para aplicar fisica!"), true);
+                      s.playSound(null, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, removed ? SoundEvents.SLIME_BLOCK_STEP : SoundEvents.SLIME_BLOCK_PLACE, SoundSource.PLAYERS, 0.85F, removed ? 0.75F : 1.15F);
+                      FPMod.sendBnc(s, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, st, 0.45F, 2);
+                      pl.displayClientMessage(Component.literal("Super Glue: " + next.length + " bloco(s) colado(s) | Agache + Clique para ativar fisica"), true);
                       return InteractionResult.CONSUME;
                   }
 
@@ -1325,12 +1340,12 @@ jobs:
                           s.setBlock(bp, Blocks.AIR.defaultBlockState(), 3);
                           parts.add(new FPBlockEntity.Part((float) (bp.getX() + 0.5 - cx), (float) (bp.getY() + 0.5 - cy), (float) (bp.getZ() + 0.5 - cz), st));
                       }
-                      Vec3 vel = new Vec3((s.random.nextDouble() - 0.5) * 0.08, -0.02, (s.random.nextDouble() - 0.5) * 0.08);
-                      Vec3 ang = new Vec3((s.random.nextDouble() - 0.5) * 0.32, (s.random.nextDouble() - 0.5) * 0.22, (s.random.nextDouble() - 0.5) * 0.32);
+                      Vec3 vel = new Vec3((s.random.nextDouble() - 0.5) * 0.05, -0.02, (s.random.nextDouble() - 0.5) * 0.05);
+                      Vec3 ang = new Vec3((s.random.nextDouble() - 0.5) * 0.24, (s.random.nextDouble() - 0.5) * 0.16, (s.random.nextDouble() - 0.5) * 0.24);
                       s.addFreshEntity(FPBlockEntity.spawn(s, cx, cy, cz, parts, vel, ang, true, true, false));
-                      s.playSound(null, cx, cy, cz, SoundEvents.SLIME_BLOCK_BREAK, SoundSource.PLAYERS, 1.1F, 0.85F);
-                      FPMod.sendBnc(s, cx, cy, cz, validSt.get(0), 1.0F, 2);
-                      pl.displayClientMessage(Component.literal("Super Glue: Fisica solida aplicada em " + parts.size() + " bloco(s)!"), true);
+                      s.playSound(null, cx, cy, cz, SoundEvents.SLIME_BLOCK_BREAK, SoundSource.PLAYERS, 1.0F, 0.88F);
+                      FPMod.sendBnc(s, cx, cy, cz, validSt.get(0), 0.75F, 2);
+                      pl.displayClientMessage(Component.literal("Super Glue: Fisica aplicada em " + parts.size() + " bloco(s)!"), true);
                   }
               }
 
@@ -1341,9 +1356,9 @@ jobs:
                       BlockPos p = e.getPos();
                       BlockState s = e.getState();
                       if (s.isAir()) return;
-                      Vec3 d = e.getPlayer() != null ? e.getPlayer().getLookAngle().scale(0.15) : Vec3.ZERO;
+                      Vec3 d = e.getPlayer() != null ? e.getPlayer().getLookAngle().scale(0.14) : Vec3.ZERO;
                       FPMod.sendBrk(l, p, s, (float) d.x, (float) d.y, (float) d.z);
-                      for (FPBlockEntity f : l.getEntitiesOfClass(FPBlockEntity.class, new AABB(p).inflate(2.5))) f.wake();
+                      for (FPBlockEntity f : l.getEntitiesOfClass(FPBlockEntity.class, new AABB(p).inflate(2.0))) f.wake();
                       if (FPMod.fullGrav) l.getServer().execute(() -> dropAbove(l, p.above(), 0));
                   }
 
@@ -1355,8 +1370,8 @@ jobs:
                       l.addFreshEntity(FPBlockEntity.spawn(
                           l, p.getX() + 0.5, p.getY() + 0.5, p.getZ() + 0.5,
                           List.of(new FPBlockEntity.Part(0, 0, 0, s)),
-                          new Vec3((l.random.nextDouble() - 0.5) * 0.08, -0.02, (l.random.nextDouble() - 0.5) * 0.08),
-                          new Vec3((l.random.nextDouble() - 0.5) * 0.35, (l.random.nextDouble() - 0.5) * 0.2, (l.random.nextDouble() - 0.5) * 0.35),
+                          new Vec3((l.random.nextDouble() - 0.5) * 0.06, -0.02, (l.random.nextDouble() - 0.5) * 0.06),
+                          new Vec3((l.random.nextDouble() - 0.5) * 0.30, (l.random.nextDouble() - 0.5) * 0.18, (l.random.nextDouble() - 0.5) * 0.30),
                           false, true, true
                       ));
                       dropAbove(l, p.above(), depth + 1);
@@ -1369,15 +1384,11 @@ jobs:
                       BlockState s = e.getPlacedBlock();
                       FPMod.sendPlc(l, p, s);
                       double cx = p.getX() + 0.5, cz = p.getZ() + 0.5;
-                      for (FPBlockEntity f : l.getEntitiesOfClass(FPBlockEntity.class, new AABB(p).inflate(3.5))) {
-                          double dx = f.px - cx, dz = f.pz - cz, d = Math.max(0.25, Math.sqrt(dx * dx + dz * dz));
-                          float k = (float) Math.max(0.0, (1.0 - d / 3.8) * 0.22);
+                      for (FPBlockEntity f : l.getEntitiesOfClass(FPBlockEntity.class, new AABB(p).inflate(1.8))) {
+                          double dx = f.px - cx, dz = f.pz - cz, d = Math.max(0.4, Math.sqrt(dx * dx + dz * dz));
+                          float k = (float) Math.max(0.0, (1.0 - d / 2.0) * 0.035);
                           f.vx += (float) ((dx / d) * k);
-                          f.vy += k * 0.75F + 0.05F;
                           f.vz += (float) ((dz / d) * k);
-                          f.wx += (l.random.nextFloat() - 0.5F) * 0.25F;
-                          f.wz += (l.random.nextFloat() - 0.5F) * 0.25F;
-                          f.wake();
                       }
                   }
 
@@ -1394,8 +1405,8 @@ jobs:
                           l.getServer().execute(() -> l.addFreshEntity(FPBlockEntity.spawn(
                               l, x, y, z,
                               List.of(new FPBlockEntity.Part(0, 0, 0, s)),
-                              new Vec3(bv.x + (l.random.nextDouble() - 0.5) * 0.09, bv.y, bv.z + (l.random.nextDouble() - 0.5) * 0.09),
-                              new Vec3((l.random.nextDouble() - 0.5) * 0.4, (l.random.nextDouble() - 0.5) * 0.25, (l.random.nextDouble() - 0.5) * 0.4),
+                              new Vec3(bv.x + (l.random.nextDouble() - 0.5) * 0.08, bv.y, bv.z + (l.random.nextDouble() - 0.5) * 0.08),
+                              new Vec3((l.random.nextDouble() - 0.5) * 0.36, (l.random.nextDouble() - 0.5) * 0.22, (l.random.nextDouble() - 0.5) * 0.36),
                               false, drop, true
                           )));
                       }
@@ -1425,12 +1436,12 @@ jobs:
                           conv.add(bp);
                           l.setBlock(bp, Blocks.AIR.defaultBlockState(), 3);
                           double dx = bp.getX() + 0.5 - c.x, dy = bp.getY() + 0.5 - c.y, dz = bp.getZ() + 0.5 - c.z, d = Math.max(0.5, Math.sqrt(dx * dx + dy * dy + dz * dz));
-                          double pw = Math.min(1.35, (rad / d) * 0.42 + 0.25);
+                          double pw = Math.min(1.25, (rad / d) * 0.38 + 0.22);
                           l.addFreshEntity(FPBlockEntity.spawn(
                               l, bp.getX() + 0.5, bp.getY() + 0.5, bp.getZ() + 0.5,
                               List.of(new FPBlockEntity.Part(0, 0, 0, s)),
-                              new Vec3((dx / d) * pw + (l.random.nextDouble() - 0.5) * 0.2, Math.max(0.28, (dy / d) * pw + 0.36), (dz / d) * pw + (l.random.nextDouble() - 0.5) * 0.2),
-                              new Vec3((l.random.nextDouble() - 0.5) * 0.95, (l.random.nextDouble() - 0.5) * 0.75, (l.random.nextDouble() - 0.5) * 0.95),
+                              new Vec3((dx / d) * pw + (l.random.nextDouble() - 0.5) * 0.18, Math.max(0.26, (dy / d) * pw + 0.34), (dz / d) * pw + (l.random.nextDouble() - 0.5) * 0.18),
+                              new Vec3((l.random.nextDouble() - 0.5) * 0.85, (l.random.nextDouble() - 0.5) * 0.65, (l.random.nextDouble() - 0.5) * 0.85),
                               false, false, i % 2 == 0
                           ));
                       }
@@ -1438,12 +1449,12 @@ jobs:
                       for (FPBlockEntity f : l.getEntitiesOfClass(FPBlockEntity.class, new AABB(c, c).inflate(rad * 2.5))) {
                           Vec3 df = f.position().subtract(c);
                           double d = Math.max(0.5, df.length());
-                          float imp = (float) Math.min(1.6, (rad / d) * 0.75);
+                          float imp = (float) Math.min(1.4, (rad / d) * 0.65);
                           f.vx += (float) ((df.x / d) * imp);
-                          f.vy += (float) ((df.y / d) * imp + 0.35F);
+                          f.vy += (float) ((df.y / d) * imp + 0.30F);
                           f.vz += (float) ((df.z / d) * imp);
-                          f.wx += (l.random.nextFloat() - 0.5F) * 0.9F;
-                          f.wz += (l.random.nextFloat() - 0.5F) * 0.9F;
+                          f.wx += (l.random.nextFloat() - 0.5F) * 0.8F;
+                          f.wz += (l.random.nextFloat() - 0.5F) * 0.8F;
                           f.wake();
                       }
                       FPMod.sendExp(l, c.x, c.y, c.z, rad, samps.stream().mapToInt(Integer::intValue).toArray());
@@ -1455,7 +1466,7 @@ jobs:
                       Entity ent = e.getEntity();
                       BlockState fl = l.getBlockState(ent.blockPosition().below());
                       if (fl.isAir()) fl = Blocks.RED_CONCRETE.defaultBlockState();
-                      FPMod.sendBnc(l, ent.getX(), ent.getY() + ent.getBbHeight() * 0.5, ent.getZ(), fl, 0.85F, 0);
+                      FPMod.sendBnc(l, ent.getX(), ent.getY() + ent.getBbHeight() * 0.5, ent.getZ(), fl, 0.70F, 0);
                   }
 
                   @SubscribeEvent
@@ -1466,8 +1477,8 @@ jobs:
                       P_PREV.put(p.getUUID(), cur);
                       P_VEL.put(p.getUUID(), vel);
                       if ((p.tickCount & 1) == 0 && vel.horizontalDistanceSqr() > 0.002) {
-                          for (ItemEntity it : p.level().getEntitiesOfClass(ItemEntity.class, p.getBoundingBox().inflate(0.4))) {
-                              it.setDeltaMovement(it.getDeltaMovement().add(vel.x * 0.75, 0.07, vel.z * 0.75));
+                          for (ItemEntity it : p.level().getEntitiesOfClass(ItemEntity.class, p.getBoundingBox().inflate(0.35))) {
+                              it.setDeltaMovement(it.getDeltaMovement().add(vel.x * 0.55, 0.04, vel.z * 0.55));
                           }
                       }
                   }
@@ -1535,6 +1546,7 @@ jobs:
           import net.minecraft.client.renderer.ItemBlockRenderTypes;
           import net.minecraft.client.renderer.LevelRenderer;
           import net.minecraft.client.renderer.MultiBufferSource;
+          import net.minecraft.client.renderer.RenderType;
           import net.minecraft.client.renderer.Sheets;
           import net.minecraft.client.renderer.block.BlockRenderDispatcher;
           import net.minecraft.client.renderer.entity.EntityRenderer;
@@ -1589,6 +1601,7 @@ jobs:
               private static final Random RNG = new Random();
               private static final List<Debris> DEB = new ArrayList<>();
               private static final List<P3D> PTS = new ArrayList<>();
+              private static final List<PlaceWave> WAVES = new ArrayList<>();
               private static final Deque<Integer> DPUSH = new ArrayDeque<>();
               private static boolean prevGnd = true;
               private static double prevY = 0;
@@ -1604,13 +1617,20 @@ jobs:
               static class P3D {
                   double x, y, z, px, py, pz;
                   float vx, vy, vz, rx, ry, rz, prx, pry, prz, wrx, wry, wrz, sx, sy, sz, grav, drag, rest, fric, buoy, u0, u1, v0, v1, r = 1, g = 1, b = 1;
-                  boolean glow = false;
-                  int age = 0, max = 95;
+                  boolean glow = false, soft = false;
+                  int age = 0, max = 90;
+              }
+
+              static class PlaceWave {
+                  double x, y, z;
+                  float u0, u1, v0, v1, r = 1, g = 1, b = 1;
+                  int age = 0, max = 7;
               }
 
               public static void clear() {
                   DEB.clear();
                   PTS.clear();
+                  WAVES.clear();
                   ItemRend.SPINS.clear();
               }
 
@@ -1632,51 +1652,64 @@ jobs:
                       double ox = ((i & 1) == 0 ? 0.25 : 0.75) + (RNG.nextDouble() - 0.5) * 0.16;
                       double oy = ((i & 2) == 0 ? 0.25 : 0.75) + (RNG.nextDouble() - 0.5) * 0.16;
                       double oz = ((i & 4) == 0 ? 0.25 : 0.75) + (RNG.nextDouble() - 0.5) * 0.16;
-                      float sx = wd ? 0.14F : (gl ? 0.34F : 0.22F + RNG.nextFloat() * 0.14F);
-                      float sy = wd ? 0.38F : (gl ? 0.08F : 0.22F + RNG.nextFloat() * 0.14F);
-                      float sz = wd ? 0.14F : 0.22F + RNG.nextFloat() * 0.14F;
+                      float sx = wd ? 0.14F : (gl ? 0.32F : 0.20F + RNG.nextFloat() * 0.12F);
+                      float sy = wd ? 0.36F : (gl ? 0.07F : 0.20F + RNG.nextFloat() * 0.12F);
+                      float sz = wd ? 0.14F : 0.20F + RNG.nextFloat() * 0.12F;
                       addDebris(
                           mc.level, m.pos().getX() + ox, m.pos().getY() + oy, m.pos().getZ() + oz, st,
-                          (float) ((ox - 0.5) * 0.36) + m.dx() + (RNG.nextFloat() - 0.5F) * 0.14F,
-                          (float) ((oy - 0.4) * 0.30) + m.dy() + 0.12F + RNG.nextFloat() * 0.15F,
-                          (float) ((oz - 0.5) * 0.36) + m.dz() + (RNG.nextFloat() - 0.5F) * 0.14F,
+                          (float) ((ox - 0.5) * 0.30) + m.dx() + (RNG.nextFloat() - 0.5F) * 0.10F,
+                          (float) ((oy - 0.4) * 0.26) + m.dy() + 0.10F + RNG.nextFloat() * 0.12F,
+                          (float) ((oz - 0.5) * 0.30) + m.dz() + (RNG.nextFloat() - 0.5F) * 0.10F,
                           sx, sy, sz
                       );
                   }
-                  spawnRich(mc.level, m.pos().getX() + 0.5, m.pos().getY() + 0.5, m.pos().getZ() + 0.5, st, FPMod.qual == 0 ? 18 : (FPMod.qual == 2 ? 46 : 30), 0.28F, 0.5F, 0);
+                  spawnRich(mc.level, m.pos().getX() + 0.5, m.pos().getY() + 0.5, m.pos().getZ() + 0.5, st, FPMod.qual == 0 ? 16 : (FPMod.qual == 2 ? 40 : 26), 0.22F, 0.48F, 0);
               }
 
+              @SuppressWarnings("deprecation")
               public static void onPlc(FPMod.Plc m) {
                   Minecraft mc = Minecraft.getInstance();
                   if (mc.level == null) return;
                   BlockState st = Block.stateById(m.id());
                   if (st.isAir()) return;
-                  double cx = m.pos().getX() + 0.5, cy = m.pos().getY() + 0.08, cz = m.pos().getZ() + 0.5;
-                  int cnt = FPMod.qual == 0 ? 16 : (FPMod.qual == 2 ? 38 : 26);
-                  for (int i = 0; i < cnt; i++) {
-                      float a = (float) (i * (Math.PI * 2.0 / cnt)) + RNG.nextFloat() * 0.25F, r = 0.48F + RNG.nextFloat() * 0.1F;
-                      int kind = (i % 3 == 0) ? 1 : (i % 3 == 1 ? 2 : 0);
-                      addPart(mc.level, cx + Mth.cos(a) * r, cy + RNG.nextFloat() * 0.16F, cz + Mth.sin(a) * r, st, Mth.cos(a) * (0.12F + RNG.nextFloat() * 0.14F), 0.07F + RNG.nextFloat() * 0.13F, Mth.sin(a) * (0.12F + RNG.nextFloat() * 0.14F), kind, 0);
-                  }
-                  for (Debris d : DEB) {
-                      double dx = d.x - cx, dy = d.y - cy, dz = d.z - cz, d2 = dx * dx + dy * dy + dz * dz;
-                      if (d2 > 0.01 && d2 < 12.25) {
-                          double dist = Math.sqrt(d2);
-                          float k = (float) ((1.0 - dist / 3.5) * 0.22);
-                          d.vx += (float) ((dx / dist) * k);
-                          d.vy += k + 0.06F;
-                          d.vz += (float) ((dz / dist) * k);
+                  double cx = m.pos().getX() + 0.5, cy = m.pos().getY() + 0.02, cz = m.pos().getZ() + 0.5;
+                  TextureAtlasSprite sp = mc.getBlockRenderer().getBlockModelShaper().getParticleIcon(st);
+                  if (sp != null) {
+                      if (WAVES.size() > 24) WAVES.remove(0);
+                      PlaceWave w = new PlaceWave();
+                      w.x = cx;
+                      w.y = cy;
+                      w.z = cz;
+                      w.u0 = Mth.lerp(0.25F, sp.getU0(), sp.getU1());
+                      w.u1 = Mth.lerp(0.75F, sp.getU0(), sp.getU1());
+                      w.v0 = Mth.lerp(0.25F, sp.getV0(), sp.getV1());
+                      w.v1 = Mth.lerp(0.75F, sp.getV0(), sp.getV1());
+                      if (FPMod.tinted(st)) {
+                          int c = mc.getBlockColors().getColor(st, mc.level, m.pos(), 0);
+                          if (c != -1) {
+                              w.r = ((c >> 16) & 255) / 255F;
+                              w.g = ((c >> 8) & 255) / 255F;
+                              w.b = (c & 255) / 255F;
+                          }
                       }
+                      WAVES.add(w);
                   }
-                  for (P3D p : PTS) {
-                      double dx = p.x - cx, dy = p.y - cy, dz = p.z - cz, d2 = dx * dx + dy * dy + dz * dz;
-                      if (d2 > 0.01 && d2 < 12.25) {
-                          double dist = Math.sqrt(d2);
-                          float k = (float) ((1.0 - dist / 3.5) * 0.25);
-                          p.vx += (float) ((dx / dist) * k);
-                          p.vy += k + 0.07F;
-                          p.vz += (float) ((dz / dist) * k);
-                      }
+                  int wisps = FPMod.qual == 0 ? 5 : 8;
+                  for (int i = 0; i < wisps; i++) {
+                      float a = (float) (i * (Math.PI * 2.0 / wisps)) + RNG.nextFloat() * 0.35F;
+                      float r = 0.46F + RNG.nextFloat() * 0.06F;
+                      addPart(
+                          mc.level,
+                          cx + Mth.cos(a) * r,
+                          cy + 0.03 + RNG.nextFloat() * 0.06,
+                          cz + Mth.sin(a) * r,
+                          st,
+                          Mth.cos(a) * (0.045F + RNG.nextFloat() * 0.035F),
+                          0.025F + RNG.nextFloat() * 0.035F,
+                          Mth.sin(a) * (0.045F + RNG.nextFloat() * 0.035F),
+                          i % 3 == 0 ? 0 : 2,
+                          0
+                      );
                   }
               }
 
@@ -1685,46 +1718,46 @@ jobs:
                   if (mc.level == null) return;
                   BlockState st = Block.stateById(m.id());
                   if (st.isAir()) return;
-                  int cnt = Mth.clamp((int) (m.pow() * 22), 8, 28);
-                  spawnRich(mc.level, m.x(), m.y(), m.z(), st, cnt, 0.18F + m.pow() * 0.18F, 0.45F, m.style());
+                  int cnt = Mth.clamp((int) (m.pow() * 16), 5, 18);
+                  spawnRich(mc.level, m.x(), m.y(), m.z(), st, cnt, 0.14F + m.pow() * 0.14F, 0.38F, m.style());
               }
 
               public static void onExp(FPMod.Exp m) {
                   Minecraft mc = Minecraft.getInstance();
                   if (mc.level == null) return;
-                  float rad = m.r() * 4.2F;
+                  float rad = m.r() * 4.0F;
                   for (Debris d : DEB) {
                       double dx = d.x - m.x(), dy = d.y - m.y(), dz = d.z - m.z(), dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
                       if (dist > 0.05 && dist < rad) {
-                          float f = (float) ((1.0 - dist / rad) * 1.15);
+                          float f = (float) ((1.0 - dist / rad) * 1.0);
                           d.vx += (float) ((dx / dist) * f);
-                          d.vy += (float) ((dy / dist) * f + 0.28F * f);
+                          d.vy += (float) ((dy / dist) * f + 0.25F * f);
                           d.vz += (float) ((dz / dist) * f);
                       }
                   }
                   for (P3D p : PTS) {
                       double dx = p.x - m.x(), dy = p.y - m.y(), dz = p.z - m.z(), dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
                       if (dist > 0.05 && dist < rad) {
-                          float f = (float) ((1.0 - dist / rad) * 1.3);
+                          float f = (float) ((1.0 - dist / rad) * 1.15);
                           p.vx += (float) ((dx / dist) * f);
-                          p.vy += (float) ((dy / dist) * f + 0.32F * f);
+                          p.vy += (float) ((dy / dist) * f + 0.28F * f);
                           p.vz += (float) ((dz / dist) * f);
                       }
                   }
                   int[] ids = m.ids();
                   if (ids.length == 0) return;
-                  int fc = FPMod.qual == 0 ? 18 : (FPMod.qual == 2 ? 48 : 30);
+                  int fc = FPMod.qual == 0 ? 16 : (FPMod.qual == 2 ? 44 : 28);
                   for (int i = 0; i < fc; i++) {
                       BlockState st = Block.stateById(ids[RNG.nextInt(ids.length)]);
                       if (st.isAir()) continue;
                       double ox = (RNG.nextDouble() - 0.5) * m.r(), oy = RNG.nextDouble() * m.r() * 0.7, oz = (RNG.nextDouble() - 0.5) * m.r(), l = Math.max(0.3, Math.sqrt(ox * ox + oy * oy + oz * oz));
-                      float spd = 0.4F + RNG.nextFloat() * 0.65F;
-                      addDebris(mc.level, m.x() + ox * 0.5, m.y() + oy * 0.5, m.z() + oz * 0.5, st, (float) (ox / l) * spd, Math.max(0.24F, (float) (oy / l) * spd + 0.28F), (float) (oz / l) * spd, 0.24F + RNG.nextFloat() * 0.18F, 0.24F + RNG.nextFloat() * 0.18F, 0.24F + RNG.nextFloat() * 0.18F);
+                      float spd = 0.36F + RNG.nextFloat() * 0.55F;
+                      addDebris(mc.level, m.x() + ox * 0.5, m.y() + oy * 0.5, m.z() + oz * 0.5, st, (float) (ox / l) * spd, Math.max(0.22F, (float) (oy / l) * spd + 0.24F), (float) (oz / l) * spd, 0.22F + RNG.nextFloat() * 0.16F, 0.22F + RNG.nextFloat() * 0.16F, 0.22F + RNG.nextFloat() * 0.16F);
                   }
-                  int pc = FPMod.qual == 0 ? 50 : (FPMod.qual == 2 ? 160 : 95);
+                  int pc = FPMod.qual == 0 ? 45 : (FPMod.qual == 2 ? 140 : 85);
                   for (int i = 0; i < pc; i++) {
                       BlockState st = Block.stateById(ids[RNG.nextInt(ids.length)]);
-                      if (!st.isAir()) spawnRich(mc.level, m.x(), m.y(), m.z(), st, 1, 0.62F, 0.9F, i % 5 == 0 ? 1 : 0);
+                      if (!st.isAir()) spawnRich(mc.level, m.x(), m.y(), m.z(), st, 1, 0.55F, 0.85F, i % 5 == 0 ? 1 : 0);
                   }
               }
 
@@ -1736,16 +1769,16 @@ jobs:
                   d.x = x; d.y = y; d.z = z;
                   d.px = x; d.py = y; d.pz = z;
                   d.vx = vx; d.vy = vy; d.vz = vz;
-                  d.wx = (RNG.nextFloat() - 0.5F) * 0.65F;
-                  d.wy = (RNG.nextFloat() - 0.5F) * 0.65F;
-                  d.wz = (RNG.nextFloat() - 0.5F) * 0.65F;
+                  d.wx = (RNG.nextFloat() - 0.5F) * 0.55F;
+                  d.wy = (RNG.nextFloat() - 0.5F) * 0.55F;
+                  d.wz = (RNG.nextFloat() - 0.5F) * 0.55F;
                   d.rot.rotationXYZ(RNG.nextFloat() * 6.28F, RNG.nextFloat() * 6.28F, RNG.nextFloat() * 6.28F).normalize();
                   d.pRot.set(d.rot);
                   d.sx = sx; d.sy = sy; d.sz = sz;
                   d.rest = FPMod.rest(st);
                   d.fric = FPMod.fric(st);
                   d.buoy = FPMod.buoy(st);
-                  d.max = 120 + RNG.nextInt(70);
+                  d.max = 115 + RNG.nextInt(65);
                   int c = Minecraft.getInstance().getBlockColors().getColor(st, l, BlockPos.containing(x, y, z), 0);
                   if (c != -1) {
                       d.r = ((c >> 16) & 255) / 255F;
@@ -1757,8 +1790,8 @@ jobs:
 
               private static void spawnRich(Level l, double x, double y, double z, BlockState st, int cnt, float spd, float spr, int style) {
                   for (int i = 0; i < cnt; i++) {
-                      int kind = style > 0 ? (i % 2 == 0 ? 3 : 2) : (i % 4 == 0 ? 2 : (i % 4 == 1 ? 1 : 0));
-                      addPart(l, x + (RNG.nextDouble() - 0.5) * spr, y + (RNG.nextDouble() - 0.5) * spr, z + (RNG.nextDouble() - 0.5) * spr, st, (RNG.nextFloat() - 0.5F) * spd * 2F, RNG.nextFloat() * spd * 1.4F + 0.05F, (RNG.nextFloat() - 0.5F) * spd * 2F, kind, style);
+                      int kind = style > 0 ? (i % 2 == 0 ? 3 : 2) : (i % 3 == 0 ? 2 : (i % 3 == 1 ? 1 : 0));
+                      addPart(l, x + (RNG.nextDouble() - 0.5) * spr, y + (RNG.nextDouble() - 0.5) * spr, z + (RNG.nextDouble() - 0.5) * spr, st, (RNG.nextFloat() - 0.5F) * spd * 1.8F, RNG.nextFloat() * spd * 1.25F + 0.04F, (RNG.nextFloat() - 0.5F) * spd * 1.8F, kind, style);
                   }
               }
 
@@ -1776,40 +1809,42 @@ jobs:
                   p.ry = RNG.nextFloat() * 6.28F;
                   p.rz = RNG.nextFloat() * 6.28F;
                   p.prx = p.rx; p.pry = p.ry; p.prz = p.rz;
-                  p.wrx = (RNG.nextFloat() - 0.5F) * 0.75F;
-                  p.wry = (RNG.nextFloat() - 0.5F) * 0.75F;
-                  p.wrz = (RNG.nextFloat() - 0.5F) * 0.75F;
-                  p.rest = FPMod.rest(st) * 0.9F + 0.14F;
+                  p.wrx = (RNG.nextFloat() - 0.5F) * 0.58F;
+                  p.wry = (RNG.nextFloat() - 0.5F) * 0.58F;
+                  p.wrz = (RNG.nextFloat() - 0.5F) * 0.58F;
+                  p.rest = FPMod.rest(st) * 0.85F + 0.10F;
                   p.fric = FPMod.fric(st);
                   p.buoy = FPMod.buoy(st);
                   if (kind == 1) {
-                      p.sx = 0.065F + RNG.nextFloat() * 0.04F;
-                      p.sy = 0.018F + RNG.nextFloat() * 0.015F;
-                      p.sz = 0.045F + RNG.nextFloat() * 0.03F;
-                      p.grav = 0.030F;
-                      p.drag = 0.982F;
-                      p.max = 85 + RNG.nextInt(55);
-                  } else if (kind == 2) {
-                      float s = 0.022F + RNG.nextFloat() * 0.024F;
-                      p.sx = s; p.sy = s; p.sz = s;
-                      p.grav = 0.009F;
-                      p.drag = 0.945F;
+                      p.sx = 0.048F + RNG.nextFloat() * 0.028F;
+                      p.sy = 0.014F + RNG.nextFloat() * 0.012F;
+                      p.sz = 0.034F + RNG.nextFloat() * 0.022F;
+                      p.grav = 0.028F;
+                      p.drag = 0.980F;
                       p.max = 75 + RNG.nextInt(50);
-                  } else if (kind == 3) {
-                      float s = 0.032F + RNG.nextFloat() * 0.026F;
+                  } else if (kind == 2) {
+                      float s = 0.016F + RNG.nextFloat() * 0.016F;
                       p.sx = s; p.sy = s; p.sz = s;
-                      p.grav = 0.014F;
-                      p.drag = 0.96F;
+                      p.grav = 0.006F;
+                      p.drag = 0.935F;
+                      p.soft = true;
+                      p.max = 55 + RNG.nextInt(40);
+                  } else if (kind == 3) {
+                      float s = 0.024F + RNG.nextFloat() * 0.020F;
+                      p.sx = s; p.sy = s; p.sz = s;
+                      p.grav = 0.010F;
+                      p.drag = 0.945F;
                       p.glow = true;
-                      p.max = 45 + RNG.nextInt(35);
+                      p.soft = true;
+                      p.max = 36 + RNG.nextInt(26);
                   } else {
-                      float s = 0.040F + RNG.nextFloat() * 0.038F;
-                      p.sx = s * (0.8F + RNG.nextFloat() * 0.4F);
-                      p.sy = s * (0.7F + RNG.nextFloat() * 0.5F);
-                      p.sz = s * (0.8F + RNG.nextFloat() * 0.4F);
-                      p.grav = 0.036F;
-                      p.drag = 0.986F;
-                      p.max = 100 + RNG.nextInt(65);
+                      float s = 0.028F + RNG.nextFloat() * 0.024F;
+                      p.sx = s * (0.8F + RNG.nextFloat() * 0.35F);
+                      p.sy = s * (0.75F + RNG.nextFloat() * 0.4F);
+                      p.sz = s * (0.8F + RNG.nextFloat() * 0.35F);
+                      p.grav = 0.034F;
+                      p.drag = 0.984F;
+                      p.max = 85 + RNG.nextInt(55);
                   }
                   float fU = RNG.nextFloat() * 0.72F, fV = RNG.nextFloat() * 0.72F;
                   p.u0 = Mth.lerp(fU, sp.getU0(), sp.getU1());
@@ -1817,9 +1852,9 @@ jobs:
                   p.v0 = Mth.lerp(fV, sp.getV0(), sp.getV1());
                   p.v1 = Mth.lerp(fV + 0.28F, sp.getV0(), sp.getV1());
                   if (style == 1 && kind == 3) {
-                      p.r = 0.85F; p.g = 0.45F; p.b = 1.0F;
+                      p.r = 0.35F; p.g = 0.90F; p.b = 1.0F;
                   } else if (style == 2 && kind == 3) {
-                      p.r = 0.35F; p.g = 1.0F; p.b = 0.42F;
+                      p.r = 0.45F; p.g = 1.0F; p.b = 0.35F;
                   } else if (FPMod.tinted(st)) {
                       int c = mc.getBlockColors().getColor(st, l, BlockPos.containing(x, y, z), 0);
                       if (c != -1) {
@@ -1835,8 +1870,9 @@ jobs:
                   if (mc.isPaused() || mc.level == null || mc.player == null) return;
                   Level lvl = mc.level;
                   Player pl = mc.player;
+                  WAVES.removeIf(w -> ++w.age >= w.max);
                   double py = pl.getY(), pVy = py - prevY;
-                  boolean stomp = pl.onGround() && !prevGnd && pVy < -0.14;
+                  boolean stomp = pl.onGround() && !prevGnd && pVy < -0.15;
                   prevGnd = pl.onGround();
                   prevY = py;
                   if (pl.onGround() && (pl.isSprinting() || stomp)) {
@@ -1844,10 +1880,10 @@ jobs:
                       BlockState fl = lvl.getBlockState(blw);
                       if (!fl.isAir() && fl.getFluidState().isEmpty()) {
                           if (stomp) {
-                              spawnRich(lvl, pl.getX(), pl.getY() + 0.08, pl.getZ(), fl, 20, 0.26F, 0.6F, 0);
-                          } else if ((pl.tickCount & 1) == 0) {
+                              spawnRich(lvl, pl.getX(), pl.getY() + 0.06, pl.getZ(), fl, 12, 0.18F, 0.5F, 0);
+                          } else if ((pl.tickCount % 3) == 0) {
                               Vec3 mv = pl.getDeltaMovement();
-                              addPart(lvl, pl.getX() + (RNG.nextDouble() - 0.5) * 0.35, pl.getY() + 0.06, pl.getZ() + (RNG.nextDouble() - 0.5) * 0.35, fl, (float) (-mv.x * 0.55) + (RNG.nextFloat() - 0.5F) * 0.09F, 0.10F + RNG.nextFloat() * 0.08F, (float) (-mv.z * 0.55) + (RNG.nextFloat() - 0.5F) * 0.09F, RNG.nextBoolean() ? 0 : 2, 0);
+                              addPart(lvl, pl.getX() + (RNG.nextDouble() - 0.5) * 0.3, pl.getY() + 0.05, pl.getZ() + (RNG.nextDouble() - 0.5) * 0.3, fl, (float) (-mv.x * 0.45) + (RNG.nextFloat() - 0.5F) * 0.06F, 0.07F + RNG.nextFloat() * 0.05F, (float) (-mv.z * 0.45) + (RNG.nextFloat() - 0.5F) * 0.06F, RNG.nextBoolean() ? 0 : 2, 0);
                           }
                       }
                   }
@@ -1880,29 +1916,29 @@ jobs:
                           d.wx *= 0.84F; d.wy *= 0.84F; d.wz *= 0.84F;
                       } else {
                           d.vy -= 0.038F;
-                          d.vx *= 0.99F; d.vy *= 0.99F; d.vz *= 0.99F;
-                          d.wx *= 0.97F; d.wy *= 0.97F; d.wz *= 0.97F;
+                          d.vx *= 0.985F; d.vy *= 0.99F; d.vz *= 0.985F;
+                          d.wx *= 0.96F; d.wy *= 0.96F; d.wz *= 0.96F;
                       }
                       double nx = d.x + d.vx;
                       if (hits(lvl, mp, nx, d.y, d.z)) {
                           d.vx = -d.vx * d.rest;
-                          d.wz = -d.vy * 2.5F;
+                          d.wz = -d.vy * 2.2F;
                       } else d.x = nx;
                       double ny = d.y + d.vy;
                       if (hits(lvl, mp, d.x, ny, d.z)) {
                           if (d.vy < 0) {
-                              if (-d.vy > 0.22F) spawnRich(lvl, d.x, d.y, d.z, d.st, 3, 0.14F, 0.18F, 0);
+                              if (-d.vy > 0.24F) spawnRich(lvl, d.x, d.y, d.z, d.st, 2, 0.11F, 0.14F, 0);
                               d.y = Math.floor(d.y) + d.sy * 0.5 + 0.002;
                               d.vy = Math.abs(d.vy) > 0.07F ? -d.vy * d.rest : 0;
-                              float dr = 1F - d.fric * 0.35F;
+                              float dr = 1F - d.fric * 0.42F;
                               d.vx *= dr; d.vz *= dr;
-                              d.wx = d.vz * 3.5F; d.wz = -d.vx * 3.5F; d.wy *= 0.85F;
+                              d.wx = d.vz * 3.0F; d.wz = -d.vx * 3.0F; d.wy *= 0.82F;
                           } else d.vy = -d.vy * d.rest;
                       } else d.y = ny;
                       double nz = d.z + d.vz;
                       if (hits(lvl, mp, d.x, d.y, nz)) {
                           d.vz = -d.vz * d.rest;
-                          d.wx = d.vy * 2.5F;
+                          d.wx = d.vy * 2.2F;
                       } else d.z = nz;
                       float wm = (float) Math.sqrt(d.wx * d.wx + d.wy * d.wy + d.wz * d.wz);
                       if (wm > 1e-4F) {
@@ -1912,27 +1948,27 @@ jobs:
                       }
                       if (swung) {
                           double dx = d.x - eye.x, dy = d.y - eye.y, dz = d.z - eye.z, d2 = dx * dx + dy * dy + dz * dz;
-                          if (d2 > 0.04 && d2 < 12.25) {
+                          if (d2 > 0.04 && d2 < 10.0) {
                               double dist = Math.sqrt(d2);
-                              if ((dx * look.x + dy * look.y + dz * look.z) / dist > 0.62) {
-                                  float f = (float) ((1.0 - dist / 3.5) * 0.55 + 0.16);
+                              if ((dx * look.x + dy * look.y + dz * look.z) / dist > 0.65) {
+                                  float f = (float) ((1.0 - dist / 3.2) * 0.34 + 0.10);
                                   d.vx += (float) (look.x * f);
-                                  d.vy += (float) (look.y * f + 0.15F);
+                                  d.vy += (float) (look.y * f + 0.10F);
                                   d.vz += (float) (look.z * f);
-                                  d.wx += (RNG.nextFloat() - 0.5F) * 0.9F;
-                                  d.wz += (RNG.nextFloat() - 0.5F) * 0.9F;
+                                  d.wx += (RNG.nextFloat() - 0.5F) * 0.6F;
+                                  d.wz += (RNG.nextFloat() - 0.5F) * 0.6F;
                               }
                           }
                       }
                       for (Entity ent : ents) {
-                          if (ent.getBoundingBox().inflate(0.2).contains(d.x, d.y, d.z)) {
+                          if (ent.getBoundingBox().inflate(0.16).contains(d.x, d.y, d.z)) {
                               double evx = ent.getX() - ent.xo, evz = ent.getZ() - ent.zo, dx = d.x - ent.getX(), dz = d.z - ent.getZ(), dl = Math.max(0.05, Math.sqrt(dx * dx + dz * dz)), sp = Math.sqrt(evx * evx + evz * evz);
-                              float k = (float) Math.min(0.45, sp * 1.45 + 0.08);
-                              d.vx += (float) ((dx / dl) * k + evx * 0.85);
-                              d.vy += 0.07F + (float) Math.min(0.12, sp * 0.4);
-                              d.vz += (float) ((dz / dl) * k + evz * 0.85);
-                              d.wx += (float) (-(dz / dl) * k * 2F);
-                              d.wz += (float) ((dx / dl) * k * 2F);
+                              float k = (float) Math.min(0.24, sp * 0.95 + 0.04);
+                              d.vx += (float) ((dx / dl) * k + evx * 0.65);
+                              d.vy += 0.04F + (float) Math.min(0.08, sp * 0.25);
+                              d.vz += (float) ((dz / dl) * k + evz * 0.65);
+                              d.wx += (float) (-(dz / dl) * k * 1.4F);
+                              d.wz += (float) ((dx / dl) * k * 1.4F);
                           }
                       }
                   }
@@ -1950,10 +1986,10 @@ jobs:
                       FluidState fl = lvl.getFluidState(mp);
                       if (!fl.isEmpty()) {
                           Vec3 fw = fl.getFlow(lvl, mp);
-                          p.vy += (-0.025F + 0.032F * p.buoy);
-                          p.vx = (p.vx + (float) fw.x * 0.03F) * 0.84F;
+                          p.vy += (-0.022F + 0.030F * p.buoy);
+                          p.vx = (p.vx + (float) fw.x * 0.026F) * 0.84F;
                           p.vy *= 0.84F;
-                          p.vz = (p.vz + (float) fw.z * 0.03F) * 0.84F;
+                          p.vz = (p.vz + (float) fw.z * 0.026F) * 0.84F;
                       } else {
                           p.vy -= p.grav;
                           p.vx *= p.drag; p.vy *= p.drag; p.vz *= p.drag;
@@ -1961,57 +1997,57 @@ jobs:
                       double nx = p.x + p.vx;
                       if (hits(lvl, mp, nx, p.y, p.z)) {
                           p.vx = -p.vx * p.rest;
-                          p.wrz = -p.vy * 4F;
+                          p.wrz = -p.vy * 3.5F;
                       } else p.x = nx;
                       double ny = p.y + p.vy;
                       if (hits(lvl, mp, p.x, ny, p.z)) {
                           if (p.vy < 0) {
                               p.y = Math.floor(p.y) + p.sy + 0.002;
                               p.vy = Math.abs(p.vy) > 0.055F ? -p.vy * p.rest : 0;
-                              float dr = 1F - p.fric * 0.32F;
+                              float dr = 1F - p.fric * 0.38F;
                               p.vx *= dr; p.vz *= dr;
-                              p.wrx = p.vz * 6.5F; p.wrz = -p.vx * 6.5F; p.wry *= 0.85F;
+                              p.wrx = p.vz * 5.5F; p.wrz = -p.vx * 5.5F; p.wry *= 0.84F;
                           } else p.vy = -p.vy * p.rest;
                       } else p.y = ny;
                       double nz = p.z + p.vz;
                       if (hits(lvl, mp, p.x, p.y, nz)) {
                           p.vz = -p.vz * p.rest;
-                          p.wrx = p.vy * 4F;
+                          p.wrx = p.vy * 3.5F;
                       } else p.z = nz;
                       p.rx += p.wrx; p.ry += p.wry; p.rz += p.wrz;
                       if (stomp) {
                           double dx = p.x - pl.getX(), dy = p.y - pl.getY(), dz = p.z - pl.getZ(), d2 = dx * dx + dy * dy + dz * dz;
-                          if (d2 > 0.005 && d2 < 9.0) {
+                          if (d2 > 0.005 && d2 < 7.5) {
                               double dist = Math.sqrt(d2);
-                              float f = (float) ((1.0 - dist / 3.0) * 0.34);
+                              float f = (float) ((1.0 - dist / 2.75) * 0.24);
                               p.vx += (float) ((dx / dist) * f);
-                              p.vy += f + 0.12F;
+                              p.vy += f * 0.85F + 0.08F;
                               p.vz += (float) ((dz / dist) * f);
                           }
                       }
                       if (swung) {
                           double dx = p.x - eye.x, dy = p.y - eye.y, dz = p.z - eye.z, d2 = dx * dx + dy * dy + dz * dz;
-                          if (d2 > 0.04 && d2 < 16.0) {
+                          if (d2 > 0.04 && d2 < 14.0) {
                               double dist = Math.sqrt(d2);
-                              if ((dx * look.x + dy * look.y + dz * look.z) / dist > 0.58) {
-                                  float f = (float) ((1.0 - dist / 4.0) * 0.65 + 0.16);
-                                  p.vx += (float) (look.x * f) + (RNG.nextFloat() - 0.5F) * 0.18F;
-                                  p.vy += (float) (look.y * f) + 0.12F;
-                                  p.vz += (float) (look.z * f) + (RNG.nextFloat() - 0.5F) * 0.18F;
-                                  p.wrx += (RNG.nextFloat() - 0.5F) * 1.4F;
-                                  p.wry += (RNG.nextFloat() - 0.5F) * 1.4F;
+                              if ((dx * look.x + dy * look.y + dz * look.z) / dist > 0.60) {
+                                  float f = (float) ((1.0 - dist / 3.75) * 0.45 + 0.12);
+                                  p.vx += (float) (look.x * f) + (RNG.nextFloat() - 0.5F) * 0.14F;
+                                  p.vy += (float) (look.y * f) + 0.09F;
+                                  p.vz += (float) (look.z * f) + (RNG.nextFloat() - 0.5F) * 0.14F;
+                                  p.wrx += (RNG.nextFloat() - 0.5F) * 1.1F;
+                                  p.wry += (RNG.nextFloat() - 0.5F) * 1.1F;
                               }
                           }
                       }
                       for (Entity ent : ents) {
-                          if (ent.getBoundingBox().inflate(0.30).contains(p.x, p.y, p.z)) {
+                          if (ent.getBoundingBox().inflate(0.28).contains(p.x, p.y, p.z)) {
                               double evx = ent.getX() - ent.xo, evy = ent.getY() - ent.yo, evz = ent.getZ() - ent.zo, dx = p.x - ent.getX(), dz = p.z - ent.getZ(), dl = Math.max(0.04, Math.sqrt(dx * dx + dz * dz)), sp = Math.sqrt(evx * evx + evz * evz);
-                              float push = (float) Math.min(0.46, sp * 1.6 + 0.07);
-                              p.vx += (float) ((dx / dl) * push + evx * 1.25 - (dz / dl) * sp * 0.55);
-                              p.vy += 0.055F + (float) Math.min(0.16, sp * 0.6) + (float) Math.max(0, evy * 0.5);
-                              p.vz += (float) ((dz / dl) * push + evz * 1.25 + (dx / dl) * sp * 0.55);
-                              p.wrx += (RNG.nextFloat() - 0.5F) * 1.0F;
-                              p.wry += (RNG.nextFloat() - 0.5F) * 1.0F;
+                              float push = (float) Math.min(0.32, sp * 1.35 + 0.045);
+                              p.vx += (float) ((dx / dl) * push + evx * 1.05 - (dz / dl) * sp * 0.50);
+                              p.vy += 0.040F + (float) Math.min(0.12, sp * 0.48) + (float) Math.max(0, evy * 0.4);
+                              p.vz += (float) ((dz / dl) * push + evz * 1.05 + (dx / dl) * sp * 0.50);
+                              p.wrx += (RNG.nextFloat() - 0.5F) * 0.85F;
+                              p.wry += (RNG.nextFloat() - 0.5F) * 0.85F;
                           }
                       }
                   }
@@ -2033,7 +2069,7 @@ jobs:
               @SuppressWarnings("deprecation")
               private static void renderAll(PoseStack ps, Vec3 cam, float pt) {
                   Minecraft mc = Minecraft.getInstance();
-                  if (mc.level == null || (DEB.isEmpty() && PTS.isEmpty())) return;
+                  if (mc.level == null || (DEB.isEmpty() && PTS.isEmpty() && WAVES.isEmpty())) return;
                   MultiBufferSource.BufferSource buf = mc.renderBuffers().bufferSource();
                   BlockRenderDispatcher brd = mc.getBlockRenderer();
                   BlockPos.MutableBlockPos mp = new BlockPos.MutableBlockPos();
@@ -2061,18 +2097,57 @@ jobs:
                       VertexConsumer vc = buf.getBuffer(Sheets.cutoutBlockSheet());
                       for (int i = 0; i < PTS.size(); i++) {
                           P3D p = PTS.get(i);
+                          if (p.soft) continue;
                           double x = Mth.lerp(pt, p.px, p.x), y = Mth.lerp(pt, p.py, p.y), z = Mth.lerp(pt, p.pz, p.z);
                           if (cam.distanceToSqr(x, y, z) > 1800.0) continue;
                           float pop = p.age < 3 ? Mth.clamp((p.age + pt) / 3F, 0.25F, 1F) : 1F;
                           float fade = p.age > p.max - 14 ? Math.max(0.01F, (p.max - p.age - pt) / 14F) : 1F;
                           float sc = pop * fade;
                           mp.set(Mth.floor(x), Mth.floor(y), Mth.floor(z));
+                          int lgt = LevelRenderer.getLightColor(mc.level, mp);
+                          q.rotationXYZ(Mth.lerp(pt, p.prx, p.rx), Mth.lerp(pt, p.pry, p.ry), Mth.lerp(pt, p.prz, p.rz));
+                          ps.pushPose();
+                          ps.translate(x, y, z);
+                          ps.mulPose(q);
+                          drawBox(vc, ps.last(), p.sx * sc, p.sy * sc, p.sz * sc, p.u0, p.u1, p.v0, p.v1, p.r, p.g, p.b, 1.0F, lgt);
+                          ps.popPose();
+                      }
+                  }
+                  if (!PTS.isEmpty() || !WAVES.isEmpty()) {
+                      VertexConsumer vt = buf.getBuffer(RenderType.entityTranslucent(InventoryMenu.BLOCK_ATLAS));
+                      for (int i = 0; i < PTS.size(); i++) {
+                          P3D p = PTS.get(i);
+                          if (!p.soft) continue;
+                          double x = Mth.lerp(pt, p.px, p.x), y = Mth.lerp(pt, p.py, p.y), z = Mth.lerp(pt, p.pz, p.z);
+                          if (cam.distanceToSqr(x, y, z) > 1800.0) continue;
+                          float t = Mth.clamp((p.age + pt) / (float) p.max, 0F, 1F);
+                          float alpha = Mth.clamp((1F - t) * 1.4F, 0.02F, p.glow ? 0.92F : 0.72F);
+                          float sc = (p.age < 3 ? Mth.clamp((p.age + pt) / 3F, 0.3F, 1F) : 1F) * (1F - t * 0.45F);
+                          mp.set(Mth.floor(x), Mth.floor(y), Mth.floor(z));
                           int lgt = p.glow ? 15728880 : LevelRenderer.getLightColor(mc.level, mp);
                           q.rotationXYZ(Mth.lerp(pt, p.prx, p.rx), Mth.lerp(pt, p.pry, p.ry), Mth.lerp(pt, p.prz, p.rz));
                           ps.pushPose();
                           ps.translate(x, y, z);
                           ps.mulPose(q);
-                          drawBox(vc, ps.last(), p.sx * sc, p.sy * sc, p.sz * sc, p.u0, p.u1, p.v0, p.v1, p.r, p.g, p.b, lgt);
+                          drawBox(vt, ps.last(), p.sx * sc, p.sy * sc, p.sz * sc, p.u0, p.u1, p.v0, p.v1, p.r, p.g, p.b, alpha, lgt);
+                          ps.popPose();
+                      }
+                      for (int i = 0; i < WAVES.size(); i++) {
+                          PlaceWave w = WAVES.get(i);
+                          float t = Mth.clamp((w.age + pt) / (float) w.max, 0F, 1F);
+                          float ease = 1F - (1F - t) * (1F - t);
+                          float out = 0.50F + ease * 0.14F, thk = 0.045F * (1F - t * 0.5F), in = out - thk;
+                          float alpha = (1F - t) * (1F - t) * 0.52F;
+                          mp.set(Mth.floor(w.x), Mth.floor(w.y), Mth.floor(w.z));
+                          int lgt = LevelRenderer.getLightColor(mc.level, mp);
+                          ps.pushPose();
+                          ps.translate(w.x, w.y, w.z);
+                          Matrix4f m = ps.last().pose();
+                          Matrix3f n = ps.last().normal();
+                          qa(vt, m, n, -out, 0, -in, out, 0, -in, out, 0, -out, -out, 0, -out, w.u0, w.u1, w.v0, w.v1, w.r, w.g, w.b, alpha, 0, 1, 0, lgt);
+                          qa(vt, m, n, -out, 0, out, out, 0, out, out, 0, in, -out, 0, in, w.u0, w.u1, w.v0, w.v1, w.r, w.g, w.b, alpha, 0, 1, 0, lgt);
+                          qa(vt, m, n, -out, 0, in, -in, 0, in, -in, 0, -in, -out, 0, -in, w.u0, w.u1, w.v0, w.v1, w.r, w.g, w.b, alpha, 0, 1, 0, lgt);
+                          qa(vt, m, n, in, 0, in, out, 0, in, out, 0, -in, in, 0, -in, w.u0, w.u1, w.v0, w.v1, w.r, w.g, w.b, alpha, 0, 1, 0, lgt);
                           ps.popPose();
                       }
                   }
@@ -2080,22 +2155,22 @@ jobs:
                   buf.endBatch();
               }
 
-              private static void drawBox(VertexConsumer vc, PoseStack.Pose ps, float x, float y, float z, float u0, float u1, float v0, float v1, float r, float g, float b, int l) {
+              private static void drawBox(VertexConsumer vc, PoseStack.Pose ps, float x, float y, float z, float u0, float u1, float v0, float v1, float r, float g, float b, float a, int l) {
                   Matrix4f m = ps.pose();
                   Matrix3f n = ps.normal();
-                  q(vc, m, n, -x, -y, z, x, -y, z, x, y, z, -x, y, z, u0, u1, v0, v1, r * 0.94F, g * 0.94F, b * 0.94F, 0, 0, 1, l);
-                  q(vc, m, n, x, -y, -z, -x, -y, -z, -x, y, -z, x, y, -z, u0, u1, v0, v1, r * 0.94F, g * 0.94F, b * 0.94F, 0, 0, -1, l);
-                  q(vc, m, n, -x, y, z, x, y, z, x, y, -z, -x, y, -z, u0, u1, v0, v1, r, g, b, 0, 1, 0, l);
-                  q(vc, m, n, -x, -y, -z, x, -y, -z, x, -y, z, -x, -y, z, u0, u1, v0, v1, r * 0.65F, g * 0.65F, b * 0.65F, 0, -1, 0, l);
-                  q(vc, m, n, x, -y, z, x, -y, -z, x, y, -z, x, y, z, u0, u1, v0, v1, r * 0.82F, g * 0.82F, b * 0.82F, 1, 0, 0, l);
-                  q(vc, m, n, -x, -y, -z, -x, -y, z, -x, y, z, -x, y, -z, u0, u1, v0, v1, r * 0.82F, g * 0.82F, b * 0.82F, -1, 0, 0, l);
+                  qa(vc, m, n, -x, -y, z, x, -y, z, x, y, z, -x, y, z, u0, u1, v0, v1, r * 0.94F, g * 0.94F, b * 0.94F, a, 0, 0, 1, l);
+                  qa(vc, m, n, x, -y, -z, -x, -y, -z, -x, y, -z, x, y, -z, u0, u1, v0, v1, r * 0.94F, g * 0.94F, b * 0.94F, a, 0, 0, -1, l);
+                  qa(vc, m, n, -x, y, z, x, y, z, x, y, -z, -x, y, -z, u0, u1, v0, v1, r, g, b, a, 0, 1, 0, l);
+                  qa(vc, m, n, -x, -y, -z, x, -y, -z, x, -y, z, -x, -y, z, u0, u1, v0, v1, r * 0.65F, g * 0.65F, b * 0.65F, a, 0, -1, 0, l);
+                  qa(vc, m, n, x, -y, z, x, -y, -z, x, y, -z, x, y, z, u0, u1, v0, v1, r * 0.82F, g * 0.82F, b * 0.82F, a, 1, 0, 0, l);
+                  qa(vc, m, n, -x, -y, -z, -x, -y, z, -x, y, z, -x, y, -z, u0, u1, v0, v1, r * 0.82F, g * 0.82F, b * 0.82F, a, -1, 0, 0, l);
               }
 
-              private static void q(VertexConsumer vc, Matrix4f m, Matrix3f n, float x1, float y1, float z1, float x2, float y2, float z2, float x3, float y3, float z3, float x4, float y4, float z4, float u0, float u1, float v0, float v1, float r, float g, float b, float nx, float ny, float nz, int l) {
-                  vc.vertex(m, x1, y1, z1).color(r, g, b, 1F).uv(u0, v1).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(l).normal(n, nx, ny, nz).endVertex();
-                  vc.vertex(m, x2, y2, z2).color(r, g, b, 1F).uv(u1, v1).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(l).normal(n, nx, ny, nz).endVertex();
-                  vc.vertex(m, x3, y3, z3).color(r, g, b, 1F).uv(u1, v0).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(l).normal(n, nx, ny, nz).endVertex();
-                  vc.vertex(m, x4, y4, z4).color(r, g, b, 1F).uv(u0, v0).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(l).normal(n, nx, ny, nz).endVertex();
+              private static void qa(VertexConsumer vc, Matrix4f m, Matrix3f n, float x1, float y1, float z1, float x2, float y2, float z2, float x3, float y3, float z3, float x4, float y4, float z4, float u0, float u1, float v0, float v1, float r, float g, float b, float a, float nx, float ny, float nz, int l) {
+                  vc.vertex(m, x1, y1, z1).color(r, g, b, a).uv(u0, v1).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(l).normal(n, nx, ny, nz).endVertex();
+                  vc.vertex(m, x2, y2, z2).color(r, g, b, a).uv(u1, v1).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(l).normal(n, nx, ny, nz).endVertex();
+                  vc.vertex(m, x3, y3, z3).color(r, g, b, a).uv(u1, v0).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(l).normal(n, nx, ny, nz).endVertex();
+                  vc.vertex(m, x4, y4, z4).color(r, g, b, a).uv(u0, v0).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(l).normal(n, nx, ny, nz).endVertex();
               }
 
               @Mod.EventBusSubscriber(modid = FPMod.MODID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
@@ -2274,7 +2349,7 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: FluidPhysics-V3-1.20.1-Forge
+          name: FluidPhysics-V4-1.20.1-Forge
           path: build/libs/*.jar
           if-no-files-found: error
 
@@ -2283,8 +2358,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "v3.0.$GITHUB_RUN_NUMBER" build/libs/*.jar \
+          gh release create "v4.0.$GITHUB_RUN_NUMBER" build/libs/*.jar \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
-            --title "Fluid Physics V3.$GITHUB_RUN_NUMBER" \
-            --notes "Fluid Physics V3 - Blocos Fisicos Solidos, Aba Criativo Fluid Physics, Texturas Proprias (Physical e Super Glue)"
+            --title "Fluid Physics V4.$GITHUB_RUN_NUMBER" \
+            --notes "Fluid Physics V4 - Subir nos blocos fisicos, empurrao/batida realista pesada, animacao suave ao colocar blocos, texturas proprias e aba no Criativo!"
