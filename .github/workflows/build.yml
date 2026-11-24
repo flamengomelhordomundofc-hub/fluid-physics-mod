@@ -1,4 +1,4 @@
-name: FluidPhysics V2
+name: FluidPhysics V3
 
 on:
   push:
@@ -25,12 +25,87 @@ jobs:
         with:
           gradle-version: '8.8'
 
-      - name: Generate V2 Mod
+      - name: Generate V3 Mod and Custom Textures
         run: |
           mkdir -p src/main/java/com/fp
           mkdir -p src/main/resources/META-INF
           mkdir -p src/main/resources/assets/fluidphysics/lang
           mkdir -p src/main/resources/assets/fluidphysics/models/item
+          mkdir -p src/main/resources/assets/fluidphysics/textures/item
+
+          python3 - << 'EOF'
+          import zlib, struct
+
+          pal = {
+              ".": [0, 0, 0, 0],
+              "K": [20, 24, 36, 255],
+              "D": [55, 65, 85, 255],
+              "S": [120, 135, 160, 255],
+              "W": [245, 252, 255, 255],
+              "C": [0, 225, 255, 255],
+              "B": [25, 130, 255, 255],
+              "V": [150, 70, 255, 255],
+              "G": [255, 205, 40, 255],
+              "Y": [255, 220, 30, 255],
+              "O": [230, 145, 10, 255],
+              "L": [140, 255, 35, 255],
+              "E": [40, 195, 45, 255],
+              "F": [18, 125, 35, 255],
+              "R": [225, 45, 55, 255],
+          }
+
+          def write_png(path, rows):
+              raw = b"".join(bytes([0]) + b"".join(bytes(pal[c]) for c in r) for r in rows)
+              chunks = [
+                  (b"IHDR", struct.pack("!IIBBBBB", 16, 16, 8, 6, 0, 0, 0)),
+                  (b"IDAT", zlib.compress(raw)),
+                  (b"IEND", b""),
+              ]
+              data = bytes([137, 80, 78, 71, 13, 10, 26, 10]) + b"".join(
+                  struct.pack("!I", len(d)) + t + d + struct.pack("!I", zlib.crc32(t + d) & 0xFFFFFFFF)
+                  for t, d in chunks
+              )
+              with open(path, "wb") as f:
+                  f.write(data)
+
+          write_png("src/main/resources/assets/fluidphysics/textures/item/physical.png", [
+              "..........C.....",
+              "........KKKKK...",
+              ".......KWWCCVK..",
+              "......KWCBBVVK.C",
+              "......KCBVVVBK..",
+              "......KCVVBBBK..",
+              ".....KGGKKKKK...",
+              "....KGSGK.......",
+              "....KKDK........",
+              "...KSDK.........",
+              "..KSDK..........",
+              ".KSDK...C.......",
+              ".KDK............",
+              "KGDK............",
+              "KGGK............",
+              ".KK.............",
+          ])
+
+          write_png("src/main/resources/assets/fluidphysics/textures/item/super_glue.png", [
+              "............KK..",
+              "...........KLLK.",
+              "..........KLEK..",
+              ".........KWSK.L.",
+              "........KWSK..E.",
+              ".......KRRK.....",
+              "......KWRRK.....",
+              ".....KWYYOK.....",
+              "....KWYEEOK.....",
+              "...KWYEEFOK.....",
+              "..KWYYEFOK......",
+              ".KWYYYOK........",
+              ".KYYOOK.........",
+              "KSSDK...........",
+              "KDDK............",
+              ".KK.............",
+          ])
+          EOF
 
           cat << 'EOF' > gradle.properties
           org.gradle.jvmargs=-Xmx3G
@@ -55,7 +130,7 @@ jobs:
               id "net.minecraftforge.gradle" version "6.0.24"
           }
 
-          version = "2.0.0"
+          version = "3.0.0"
           group = "com.fp"
 
           base {
@@ -84,7 +159,7 @@ jobs:
           cat << 'EOF' > src/main/resources/pack.mcmeta
           {
             "pack": {
-              "description": "Fluid Physics V2",
+              "description": "Fluid Physics V3",
               "pack_format": 15
             }
           }
@@ -97,9 +172,9 @@ jobs:
 
           [[mods]]
           modId="fluidphysics"
-          version="2.0.0"
-          displayName="Fluid Physics V2"
-          description="3D Rigid Body Physics, Physical Tool, Super Glue and Interactive Particles"
+          version="3.0.0"
+          displayName="Fluid Physics V3"
+          description="Solid Collidable 3D Physics Blocks, Physical Wand, Super Glue, Custom Textures and Creative Tab"
 
           [[dependencies.fluidphysics]]
               modId="forge"
@@ -136,7 +211,7 @@ jobs:
           {
             "parent": "minecraft:item/generated",
             "textures": {
-              "layer0": "minecraft:item/amethyst_shard"
+              "layer0": "fluidphysics:item/physical"
             }
           }
           EOF
@@ -145,7 +220,7 @@ jobs:
           {
             "parent": "minecraft:item/generated",
             "textures": {
-              "layer0": "minecraft:item/slime_ball"
+              "layer0": "fluidphysics:item/super_glue"
             }
           }
           EOF
@@ -154,14 +229,18 @@ jobs:
           package com.fp;
 
           import net.minecraft.core.BlockPos;
+          import net.minecraft.core.registries.Registries;
           import net.minecraft.network.FriendlyByteBuf;
+          import net.minecraft.network.chat.Component;
           import net.minecraft.resources.ResourceLocation;
           import net.minecraft.server.level.ServerLevel;
           import net.minecraft.tags.BlockTags;
           import net.minecraft.world.entity.EntityType;
           import net.minecraft.world.entity.MobCategory;
+          import net.minecraft.world.item.CreativeModeTab;
           import net.minecraft.world.item.CreativeModeTabs;
           import net.minecraft.world.item.Item;
+          import net.minecraft.world.item.ItemStack;
           import net.minecraft.world.level.BlockGetter;
           import net.minecraft.world.level.block.Block;
           import net.minecraft.world.level.block.Blocks;
@@ -199,6 +278,8 @@ jobs:
                   DeferredRegister.create(ForgeRegistries.ENTITY_TYPES, MODID);
               public static final DeferredRegister<Item> ITEMS =
                   DeferredRegister.create(ForgeRegistries.ITEMS, MODID);
+              public static final DeferredRegister<CreativeModeTab> TABS =
+                  DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
 
               public static final RegistryObject<EntityType<FPBlockEntity>> FLUID_BLOCK =
                   ENTITIES.register("fluid_block", () ->
@@ -214,17 +295,29 @@ jobs:
               public static final RegistryObject<Item> SUPER_GLUE =
                   ITEMS.register("super_glue", () -> new FPTools.SuperGlueItem(new Item.Properties().stacksTo(1)));
 
+              public static final RegistryObject<CreativeModeTab> TAB = TABS.register("fluidphysics_tab", () ->
+                  CreativeModeTab.builder()
+                      .title(Component.literal("Fluid Physics"))
+                      .icon(() -> new ItemStack(PHYSICAL.get()))
+                      .displayItems((p, o) -> {
+                          o.accept(PHYSICAL.get());
+                          o.accept(SUPER_GLUE.get());
+                      })
+                      .build()
+              );
+
               public static final SimpleChannel CH = NetworkRegistry.newSimpleChannel(
                   new ResourceLocation(MODID, "net"),
-                  () -> "2",
-                  "2"::equals,
-                  "2"::equals
+                  () -> "3",
+                  "3"::equals,
+                  "3"::equals
               );
 
               public FPMod() {
                   IEventBus b = FMLJavaModLoadingContext.get().getModEventBus();
                   ENTITIES.register(b);
                   ITEMS.register(b);
+                  TABS.register(b);
                   b.addListener(this::commonSetup);
                   b.addListener(this::addCreative);
                   MinecraftForge.EVENT_BUS.register(new FPTools.Events());
@@ -235,7 +328,7 @@ jobs:
               }
 
               private void addCreative(BuildCreativeModeTabContentsEvent e) {
-                  if (e.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
+                  if (e.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES || e.getTabKey() == CreativeModeTabs.FUNCTIONAL_BLOCKS) {
                       e.accept(PHYSICAL.get());
                       e.accept(SUPER_GLUE.get());
                   }
@@ -556,10 +649,32 @@ jobs:
                   return prevQ.slerp(currQ, pt, new Quaternionf()).normalize();
               }
 
+              private void updateSolidBounds(double cx, double cy, double cz, Quaternionf q) {
+                  List<Part> pl = getBlockParts();
+                  double x0 = cx - 0.5, y0 = cy - 0.5, z0 = cz - 0.5, x1 = cx + 0.5, y1 = cy + 0.5, z1 = cz + 0.5;
+                  if (pl.size() > 1) {
+                      x0 = y0 = z0 = 1e9;
+                      x1 = y1 = z1 = -1e9;
+                      Vector3f v = new Vector3f();
+                      for (Part pt : pl) {
+                          v.set(pt.ox, pt.oy, pt.oz);
+                          q.transform(v);
+                          double bx0 = cx + v.x - 0.48, by0 = cy + v.y - 0.48, bz0 = cz + v.z - 0.48;
+                          double bx1 = cx + v.x + 0.48, by1 = cy + v.y + 0.48, bz1 = cz + v.z + 0.48;
+                          if (bx0 < x0) x0 = bx0;
+                          if (by0 < y0) y0 = by0;
+                          if (bz0 < z0) z0 = bz0;
+                          if (bx1 > x1) x1 = bx1;
+                          if (by1 > y1) y1 = by1;
+                          if (bz1 > z1) z1 = bz1;
+                      }
+                  }
+                  this.setBoundingBox(new AABB(x0, y0, z0, x1, y1, z1));
+              }
+
               private void syncAll() {
                   this.setPos(px, py - 0.5, pz);
-                  float r = Math.max(0.49F, getRad());
-                  this.setBoundingBox(new AABB(px - r, py - r, pz - r, px + r, py + r, pz + r));
+                  updateSolidBounds(px, py, pz, rot);
                   this.setDeltaMovement(vx, vy, vz);
                   entityData.set(D_QX, rot.x);
                   entityData.set(D_QY, rot.y);
@@ -600,15 +715,13 @@ jobs:
                           setPos(getX() + (lX - getX()) / lSteps, getY() + (lY - getY()) / lSteps, getZ() + (lZ - getZ()) / lSteps);
                           lSteps--;
                       }
-                      float r = Math.max(0.49F, getRad());
-                      double cy = getY() + 0.5;
-                      setBoundingBox(new AABB(getX() - r, cy - r, getZ() - r, getX() + r, cy + r, getZ() + r));
                       prevQ.set(currQ);
                       currQ.set(entityData.get(D_QX), entityData.get(D_QY), entityData.get(D_QZ), entityData.get(D_QW)).normalize();
                       if (!qInit) {
                           prevQ.set(currQ);
                           qInit = true;
                       }
+                      updateSolidBounds(getX(), getY() + 0.5, getZ(), currQ);
                       return;
                   }
                   ServerLevel sLvl = (ServerLevel) level();
@@ -843,13 +956,14 @@ jobs:
               }
 
               private void interactEntities(ServerLevel sLvl, BlockState st, float spd) {
+                  AABB box = getBoundingBox();
                   float r = getRad();
-                  List<Entity> list = sLvl.getEntities(this, getBoundingBox().inflate(0.35));
+                  List<Entity> list = sLvl.getEntities(this, box.inflate(0.22));
                   for (Entity ent : list) {
                       if (ent instanceof FPBlockEntity other && other.getId() > getId()) {
                           double dx = px - other.px, dy = py - other.py, dz = pz - other.pz;
                           double d2 = dx * dx + dy * dy + dz * dz;
-                          double minD = Math.min(2.2, (r + other.getRad()) * 0.85);
+                          double minD = Math.min(2.4, (r + other.getRad()) * 0.90);
                           if (d2 > 0.0001 && d2 < minD * minD) {
                               double d = Math.sqrt(d2), nx = dx / d, ny = dy / d, nz = dz / d, ov = (minD - d) * 0.5;
                               px += nx * ov;
@@ -878,7 +992,11 @@ jobs:
                           double d2 = dx * dx + dy * dy + dz * dz;
                           if (d2 < 0.001) continue;
                           double d = Math.sqrt(d2);
-                          if (spd > 0.48F && vy < -0.25F && mass >= 1.5F && age > 5) {
+                          if (ent.getY() >= box.maxY - 0.28) {
+                              float mScale = 1.0F / Math.max(1.0F, mass);
+                              wx += (float) (-(ent.getZ() - pz) * 0.018 * mScale);
+                              wz += (float) ((ent.getX() - px) * 0.018 * mScale);
+                          } else if (spd > 0.48F && vy < -0.25F && mass >= 1.5F && age > 5) {
                               float dmg = Mth.clamp(spd * Math.min(4F, mass) * 3.5F, 2F, 16F);
                               ent.hurt(st.getSoundType() == SoundType.ANVIL ? damageSources().anvil(this) : damageSources().fallingBlock(this), dmg);
                               vy = Math.abs(vy) * 0.35F + 0.12F;
@@ -886,18 +1004,31 @@ jobs:
                               wz += (sLvl.random.nextFloat() - 0.5F) * 0.5F;
                           } else {
                               double es = ev.horizontalDistance();
-                              float mScale = 1.0F / Math.max(0.8F, (float) Math.sqrt(mass));
-                              float push = (float) (Math.min(0.42, es * 1.15 + 0.055) * mScale);
-                              vx += (float) ((dx / d) * push + ev.x * 0.72 * mScale);
-                              vy += (float) (Math.min(0.11, 0.03 + es * 0.18) * mScale);
-                              vz += (float) ((dz / d) * push + ev.z * 0.72 * mScale);
-                              wx += (float) (-(dz / d) * push * 1.15);
-                              wy += (float) ((ev.x * dz - ev.z * dx) * 0.35 * mScale);
-                              wz += (float) ((dx / d) * push * 1.15);
-                              restTicks = 0;
+                              double dot = (ev.x * dx + ev.z * dz);
+                              if (es > 0.015 && dot > -0.01) {
+                                  float mScale = 1.0F / Math.max(0.85F, (float) Math.sqrt(mass));
+                                  float push = (float) (Math.min(0.36, es * 0.95 + 0.03) * mScale);
+                                  vx += (float) ((dx / d) * push + ev.x * 0.65 * mScale);
+                                  vy += (float) (Math.min(0.08, 0.015 + es * 0.12) * mScale);
+                                  vz += (float) ((dz / d) * push + ev.z * 0.65 * mScale);
+                                  wx += (float) (-(dz / d) * push * 0.95);
+                                  wy += (float) ((ev.x * dz - ev.z * dx) * 0.25 * mScale);
+                                  wz += (float) ((dx / d) * push * 0.95);
+                                  restTicks = 0;
+                              }
                           }
                       }
                   }
+              }
+
+              @Override
+              public boolean canBeCollidedWith() {
+                  return this.isAlive();
+              }
+
+              @Override
+              public boolean canCollideWith(Entity e) {
+                  return e.canBeCollidedWith() && !this.isPassengerOfSameVehicle(e);
               }
 
               @Override
@@ -1097,7 +1228,7 @@ jobs:
                       s.playSound(null, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 1.15F);
                       FPMod.sendBnc(s, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, st, 0.85F, 1);
                       if (ctx.getPlayer() != null) {
-                          ctx.getPlayer().displayClientMessage(Component.literal("Physical: Fisica real ativada! (Bata para lancar, Agache+Bata para quebrar)"), true);
+                          ctx.getPlayer().displayClientMessage(Component.literal("Physical: Bloco solido fisico ativado! (Empurre, suba em cima, bata ou Agache+Bata)"), true);
                       }
                       return InteractionResult.CONSUME;
                   }
@@ -1199,7 +1330,7 @@ jobs:
                       s.addFreshEntity(FPBlockEntity.spawn(s, cx, cy, cz, parts, vel, ang, true, true, false));
                       s.playSound(null, cx, cy, cz, SoundEvents.SLIME_BLOCK_BREAK, SoundSource.PLAYERS, 1.1F, 0.85F);
                       FPMod.sendBnc(s, cx, cy, cz, validSt.get(0), 1.0F, 2);
-                      pl.displayClientMessage(Component.literal("Super Glue: Fisica real aplicada em " + parts.size() + " bloco(s)!"), true);
+                      pl.displayClientMessage(Component.literal("Super Glue: Fisica solida aplicada em " + parts.size() + " bloco(s)!"), true);
                   }
               }
 
@@ -2143,7 +2274,7 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: FluidPhysics-V2-1.20.1-Forge
+          name: FluidPhysics-V3-1.20.1-Forge
           path: build/libs/*.jar
           if-no-files-found: error
 
@@ -2152,8 +2283,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "v2.0.$GITHUB_RUN_NUMBER" build/libs/*.jar \
+          gh release create "v3.0.$GITHUB_RUN_NUMBER" build/libs/*.jar \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
-            --title "Fluid Physics V2.$GITHUB_RUN_NUMBER" \
-            --notes "Fluid Physics V2 (Minecraft 1.20.1 Forge) - Itens: Physical e Super Glue (/physics items)"
+            --title "Fluid Physics V3.$GITHUB_RUN_NUMBER" \
+            --notes "Fluid Physics V3 - Blocos Fisicos Solidos, Aba Criativo Fluid Physics, Texturas Proprias (Physical e Super Glue)"
